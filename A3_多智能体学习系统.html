@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 · 多智能体个性化学习系统</title>
+<style>
+:root{--primary:#6c5ce7;--accent:#00cec9;--bg:#0a0a1a;--card:#16162a;--text:#e0e0e0;--muted:#888;--success:#00b894;--warning:#fdcb6e;--danger:#ff7675;--glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* ===== 粒子背景 ===== */
+#particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+/* ===== 头部 ===== */
+.header{position:relative;z-index:10;background:linear-gradient(135deg,rgba(108,92,231,0.3),rgba(0,206,201,0.15));border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(12px)}
+.header .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-size:16px}
+.header h1{font-size:15px;font-weight:600;letter-spacing:1px}
+.header .subtitle{font-size:11px;color:var(--muted);margin-left:auto}
+.agent-switcher{display:flex;gap:4px;margin-left:12px}
+.agent-switcher button{padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s}
+.agent-switcher button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.agent-switcher button:hover:not(.active){border-color:var(--primary);color:var(--primary)}
+/* ===== 主体 ===== */
+.main{flex:1;display:flex;overflow:hidden;position:relative;z-index:1}
+/* ===== 聊天面板 ===== */
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0}
+.messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.messages::-webkit-scrollbar{width:4px}
+.messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.msg{max-width:80%;padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.8;animation:msgIn .3s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--primary),#5a4bd1);color:#fff;border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:var(--card);color:var(--text);border-bottom-left-radius:4px;border:1px solid var(--border)}
+.msg .agent-tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;margin-bottom:6px;font-weight:600}
+.msg .agent-tag.tutor{background:rgba(108,92,231,0.2);color:#a29bfe}
+.msg .agent-tag.knowledge{background:rgba(0,206,201,0.2);color:#00cec9}
+.msg .agent-tag.evaluator{background:rgba(253,203,110,0.2);color:#fdcb6e}
+.msg .agent-tag.planner{background:rgba(0,184,148,0.2);color:#00b894}
+.msg .agent-tag.coordinator{background:rgba(255,118,117,0.2);color:#ff7675}
+.msg code{background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:12px;font-family:"SF Mono",Consolas,monospace}
+.msg pre{background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;overflow-x:auto;margin:8px 0;font-size:12px;line-height:1.6}
+.msg pre code{background:none;padding:0}
+.typing-indicator{display:flex;gap:4px;padding:8px 0}
+.typing-indicator span{width:8px;height:8px;border-radius:50%;background:var(--muted);animation:typingDot 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
+@keyframes typingDot{0%,60%,100%{opacity:.3;transform:scale(.8)}30%{opacity:1;transform:scale(1)}}
+/* ===== 快捷按钮 ===== */
+.quick-btns{padding:10px 16px;display:flex;gap:6px;flex-wrap:wrap;background:rgba(0,0,0,0.2);border-top:1px solid var(--border)}
+.quick-btn{background:var(--glass);border:1px solid var(--border);color:var(--muted);border-radius:16px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.quick-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px)}
+/* ===== 输入区 ===== */
+.input-area{padding:12px 16px;background:rgba(0,0,0,0.3);border-top:1px solid var(--border);display:flex;gap:8px}
+.input-area input{flex:1;border:1px solid var(--border);border-radius:24px;padding:10px 16px;font-size:14px;outline:none;background:var(--card);color:var(--text);transition:border-color .2s}
+.input-area input:focus{border-color:var(--primary)}
+.input-area input::placeholder{color:var(--muted)}
+.send-btn{border:none;border-radius:24px;padding:10px 24px;cursor:pointer;font-size:14px;font-weight:600;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;transition:all .2s}
+.send-btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(108,92,231,0.4)}
+.send-btn:active{transform:scale(.97)}
+/* ===== 侧边面板 ===== */
+.side-panel{width:380px;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.side-panel::-webkit-scrollbar{width:4px}
+.side-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.panel-section{padding:16px;border-bottom:1px solid var(--border)}
+.panel-section h3{font-size:13px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.panel-section h3 svg{width:16px;height:16px}
+/* ===== 雷达图 ===== */
+.radar-wrap{width:100%;aspect-ratio:1;position:relative}
+.radar-wrap canvas{width:100%;height:100%}
+/* ===== 学习路径 ===== */
+.path-list{display:flex;flex-direction:column;gap:8px}
+.path-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:var(--glass);border:1px solid var(--border);transition:all .2s}
+.path-item:hover{border-color:var(--primary);transform:translateX(2px)}
+.path-item .step{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.path-item.done .step{background:var(--success);color:#fff}
+.path-item.active .step{background:var(--warning);color:#333;box-shadow:0 0 10px rgba(253,203,110,0.4)}
+.path-item.locked .step{background:var(--muted);color:#fff;opacity:.5}
+.path-item .info{flex:1;min-width:0}
+.path-item .info .title{font-size:13px;font-weight:600}
+.path-item .info .meta{font-size:11px;color:var(--muted)}
+.path-item .bar{width:50px;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;flex-shrink:0}
+.path-item .bar .fill{height:100%;border-radius:3px;transition:width .5s ease}
+.path-item.done .fill{background:var(--success)}
+.path-item.active .fill{background:var(--warning)}
+.path-item.locked .fill{background:var(--muted)}
+/* ===== 统计卡片 ===== */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;transition:all .2s}
+.stat-card:hover{border-color:var(--primary);transform:translateY(-2px)}
+.stat-card .value{font-size:22px;font-weight:700;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-card .label{font-size:11px;color:var(--muted);margin-top:4px}
+/* ===== 资源标签 ===== */
+.resource-tabs{display:flex;gap:4px;margin-bottom:10px}
+.resource-tabs button{flex:1;padding:6px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;font-size:11px;cursor:pointer;transition:all .2s}
+.resource-tabs button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.resource-tabs button:hover:not(.active){border-color:var(--primary);color:var(--primary)}
+.resource-list{display:flex;flex-direction:column;gap:6px}
+.resource-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--border);font-size:12px;cursor:pointer;transition:all .2s}
+.resource-item:hover{border-color:var(--accent);background:rgba(0,206,201,0.05)}
+.resource-item .icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.resource-item .icon.video{background:rgba(108,92,231,0.2);color:#a29bfe}
+.resource-item .icon.doc{background:rgba(0,206,201,0.2);color:#00cec9}
+.resource-item .icon.quiz{background:rgba(253,203,110,0.2);color:#fdcb6e}
+/* ===== 对话历史 ===== */
+.history-list{display:flex;flex-direction:column;gap:4px}
+.history-item{padding:8px 10px;border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px}
+.history-item:hover{background:var(--glass)}
+.history-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.history-item .dot.green{background:var(--success)}
+.history-item .dot.blue{background:var(--primary)}
+.history-item .dot.yellow{background:var(--warning)}
+/* ===== 底部标签 ===== */
+.bottom-tabs{display:flex;border-top:1px solid var(--border);background:var(--card)}
+.bottom-tabs button{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bottom-tabs button.active{color:var(--accent)}
+.bottom-tabs button svg{width:18px;height:18px}
+.bottom-tabs button:hover{color:var(--text)}
+/* ===== 响应式 ===== */
+@media(max-width:900px){
+  .main{flex-direction:column}
+  .side-panel{width:100%;max-height:45vh}
+  .agent-switcher{display:none}
+}
+@media(max-width:600px){
+  .header h1{font-size:13px}
+  .msg{max-width:90%}
+  .quick-btns{overflow-x:auto;flex-wrap:nowrap}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+/* ===== 滚动条全局 ===== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.15)}
+</style>
+</head>
+<body>
+<!-- 粒子背景 -->
+<canvas id="particles"></canvas>
+
+<!-- 头部 -->
+<div class="header">
+  <div class="logo">🧠</div>
+  <div>
+    <h1>AI学习伴侣 · 多智能体系统</h1>
+  </div>
+  <span class="subtitle">v2.0 增强版</span>
+  <div class="agent-switcher">
+    <button class="active" onclick="switchAgent('all')">全部Agent</button>
+    <button onclick="switchAgent('tutor')">导师</button>
+    <button onclick="switchAgent('knowledge')">知识图谱</button>
+    <button onclick="switchAgent('evaluator')">评估</button>
+    <button onclick="switchAgent('planner')">规划</button>
+  </div>
+</div>
+
+<!-- 主体 -->
+<div class="main">
+  <!-- 聊天面板 -->
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+      <div class="msg bot">
+        <span class="agent-tag coordinator">🤖 协调Agent</span>
+        你好，同学！我是你的AI学习伴侣 👋<br><br>
+        我可以帮你：<br>
+        • 📝 生成学习笔记和思维导图<br>
+        • 💡 解答疑问并提供代码示例<br>
+        • 🗺️ 规划个性化学习路径<br>
+        • 📊 评估学习进度并给出建议<br><br>
+        试试下面的快捷按钮，或者直接告诉我你想学什么！
+      </div>
+    </div>
+    <div class="quick-btns">
+      <button class="quick-btn" onclick="sendQuick('帮我讲解Python函数')">📚 讲解函数</button>
+      <button class="quick-btn" onclick="sendQuick('生成Python知识思维导图')">🧠 思维导图</button>
+      <button class="quick-btn" onclick="sendQuick('出几道练习题考考我')">📝 练习题</button>
+      <button class="quick-btn" onclick="sendQuick('规划我的学习路径')">🗺️ 学习路径</button>
+      <button class="quick-btn" onclick="sendQuick('评估我的学习进度')">📊 学习评估</button>
+      <button class="quick-btn" onclick="sendQuick('帮我复习控制流')">🔄 复习巩固</button>
+    </div>
+    <div class="input-area">
+      <input id="input" placeholder="输入你想学的内容..." onkeydown="if(event.key==='Enter')sendMessage()">
+      <button class="send-btn" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+
+  <!-- 侧边面板 -->
+  <div class="side-panel">
+    <!-- 统计概览 -->
+    <div class="panel-section">
+      <h3>📈 学习概览</h3>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="value" id="statHours">12.5</div><div class="label">学习时长(h)</div></div>
+        <div class="stat-card"><div class="value" id="statTasks">28</div><div class="label">完成任务</div></div>
+        <div class="stat-card"><div class="value" id="statStreak">7</div><div class="label">连续天数</div></div>
+        <div class="stat-card"><div class="value" id="statScore">72</div><div class="label">综合评分</div></div>
+      </div>
+    </div>
+
+    <!-- 学生画像 -->
+    <div class="panel-section">
+      <h3>🎯 能力画像</h3>
+      <div class="radar-wrap">
+        <canvas id="radarChart"></canvas>
+      </div>
+    </div>
+
+    <!-- 学习路径 -->
+    <div class="panel-section">
+      <h3>🗺️ 学习路径</h3>
+      <div class="path-list" id="pathList">
+        <div class="path-item done"><div class="step">✓</div><div class="info"><div class="title">Python基础语法</div><div class="meta">已完成 · 掌握率 95%</div></div><div class="bar"><div class="fill" style="width:100%"></div></div></div>
+        <div class="path-item done"><div class="step">✓</div><div class="info"><div class="title">变量与数据类型</div><div class="meta">已完成 · 掌握率 88%</div></div><div class="bar"><div class="fill" style="width:100%"></div></div></div>
+        <div class="path-item active"><div class="step">3</div><div class="info"><div class="title">控制流</div><div class="meta">学习中 · 进度 70%</div></div><div class="bar"><div class="fill" style="width:70%"></div></div></div>
+        <div class="path-item locked"><div class="step">4</div><div class="info"><div class="title">函数与模块</div><div class="meta">未开始</div></div><div class="bar"><div class="fill" style="width:0%"></div></div></div>
+        <div class="path-item locked"><div class="step">5</div><div class="info"><div class="title">面向对象编程</div><div class="meta">未开始</div></div><div class="bar"><div class="fill" style="width:0%"></div></div></div>
+        <div class="path-item locked"><div class="step">6</div><div class="info"><div class="title">文件与异常处理</div><div class="meta">未开始</div></div><div class="bar"><div class="fill" style="width:0%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- 学习资源 -->
+    <div class="panel-section">
+      <h3>📚 推荐资源</h3>
+      <div class="resource-tabs">
+        <button class="active" onclick="switchTab('video',this)">视频</button>
+        <button onclick="switchTab('doc',this)">文档</button>
+        <button onclick="switchTab('quiz',this)">练习</button>
+      </div>
+      <div class="resource-list" id="resourceList">
+        <div class="resource-item" data-type="video"><div class="icon video">▶</div><div><div style="font-weight:600">Python函数精讲</div><div style="font-size:11px;color:var(--muted)">15分钟 · B站</div></div></div>
+        <div class="resource-item" data-type="video"><div class="icon video">▶</div><div><div style="font-weight:600">面向对象入门</div><div style="font-size:11px;color:var(--muted)">20分钟 · 慕课网</div></div></div>
+        <div class="resource-item" data-type="doc"><div class="icon doc">📄</div><div><div style="font-weight:600">Python官方教程</div><div style="font-size:11px;color:var(--muted)">官方文档 · 完整版</div></div></div>
+        <div class="resource-item" data-type="doc"><div class="icon doc">📄</div><div><div style="font-weight:600">函数式编程指南</div><div style="font-size:11px;color:var(--muted)">菜鸟教程 · 精简版</div></div></div>
+        <div class="resource-item" data-type="quiz"><div class="icon quiz">❓</div><div><div style="font-weight:600">函数基础测验</div><div style="font-size:11px;color:var(--muted)">10题 · 难度中等</div></div></div>
+        <div class="resource-item" data-type="quiz"><div class="icon quiz">❓</div><div><div style="font-weight:600">面向对象挑战</div><div style="font-size:11px;color:var(--muted)">15题 · 难度较高</div></div></div>
+      </div>
+    </div>
+
+    <!-- 对话历史 -->
+    <div class="panel-section">
+      <h3>💬 最近对话</h3>
+      <div class="history-list">
+        <div class="history-item"><div class="dot green"></div><div>Python函数讲解 · 2小时前</div></div>
+        <div class="history-item"><div class="dot blue"></div><div>学习路径规划 · 昨天</div></div>
+        <div class="history-item"><div class="dot yellow"></div><div>控制流练习反馈 · 3天前</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 粒子背景 =====
+(function(){
+  var c=document.getElementById('particles'),ctx=c.getContext('2d');
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+  var pts=[];for(var i=0;i<60;i++){pts.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.5+.5,dx:(Math.random()-.5)*.3,dy:(Math.random()-.5)*.3,a:Math.random()*.4+.1})}
+  function anim(){
+    ctx.clearRect(0,0,c.width,c.height);
+    for(var i=0;i<pts.length;i++){
+      var p=pts[i];
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(108,92,231,'+p.a+')';ctx.fill();
+      p.x+=p.dx;p.y+=p.dy;
+      if(p.x<0||p.x>c.width)p.dx*=-1;
+      if(p.y<0||p.y>c.height)p.dy*=-1;
+    }
+    // 连线
+    for(var i=0;i<pts.length;i++){
+      for(var j=i+1;j<pts.length;j++){
+        var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<120){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(108,92,231,'+(0.1*(1-d/120))+')';ctx.stroke()}
+      }
+    }
+    requestAnimationFrame(anim);
+  }
+  anim();
+})();
+
+// ===== 知识库 =====
+var KB={
+  "Python函数":{agent:"tutor",tag:"🧑‍🏫 导师Agent",cls:"tutor",reply:"<span class='agent-tag tutor'>🧑‍🏫 导师Agent</span>好的，让我为你详细讲解Python函数！<br><br><b>一、函数的定义与调用</b><br>函数是使用 <code>def</code> 关键字定义的代码块：<br><pre><code>def greet(name):<br>    &quot;&quot;&quot;向用户打招呼&quot;&quot;&quot;<br>    return f&quot;你好，{name}！&quot;</code></pre><br><b>二、参数类型</b><br>• <b>位置参数</b>：按顺序传递，如 <code>greet(&quot;张三&quot;)</code><br>• <b>默认参数</b>：<code>def func(a=1, b=2)</code><br>• <b>关键字参数</b>：<code>func(a=1, b=2)</code><br>• <b>*args</b>：接收可变位置参数，返回元组<br>• <b>**kwargs</b>：接收可变关键字参数，返回字典<br><br><b>三、作用域规则</b><br>• <b>局部变量</b>：在函数内部定义，仅函数内可用<br>• <b>全局变量</b>：在函数外部定义，整个程序可用<br>• <code>global</code> / <code>nonlocal</code>：修改外层作用域变量<br><br><b>四、Lambda 表达式</b><br><pre><code>f = lambda x, y: x + y<br>print(f(3, 4))  # 输出: 7</code></pre><br>要我出几道练习题巩固一下吗？"}
+,"思维导图":{agent:"knowledge",tag:"🗂️ 知识图谱Agent",cls:"knowledge",reply:"<span class='agent-tag knowledge'>🗂️ 知识图谱Agent</span>为你生成Python函数的知识图谱：<br><br>📦 <b>Python函数体系</b><br>├── 📌 基础概念<br>│   ├── def 关键字<br>│   ├── 函数名命名规范<br>│   └── return 返回值<br>├── 📌 参数系统<br>│   ├── 位置参数<br>│   ├── 默认参数<br>│   ├── 关键字参数<br>│   ├── *args (元组)<br>│   └── **kwargs (字典)<br>├── 📌 作用域<br>│   ├── 局部作用域 (L)<br>│   ├── 外层函数作用域 (E)<br>│   ├── 全局作用域 (G)<br>│   └── 内置作用域 (B)<br>├── 📌 高级特性<br>│   ├── Lambda 匿名函数<br>│   ├── 装饰器 @decorator<br>│   ├── 闭包 Closure<br>│   └── 递归 Recursion<br>└── 📌 内置函数<br>    ├── map() / filter()<br>    ├── reduce() (functools)<br>    ├── zip() / enumerate()<br>    └── sorted() / reversed()<br><br>需要我展开哪个分支的详细讲解？"}
+,"练习":{agent:"evaluator",tag:"📝 评估Agent",cls:"evaluator",reply:"<span class='agent-tag evaluator'>📝 评估Agent</span>为你准备了3道递进难度的练习题：<br><br><b>🟢 基础题</b><br>编写一个函数 <code>double_list(lst)</code>，接收一个列表，返回每个元素乘以2后的新列表。<br><br><b>🟡 进阶题</b><br>编写一个装饰器 <code>timer</code>，可以打印函数的执行时间（毫秒）。<br><br><b>🔴 挑战题</b><br>实现一个工厂函数 <code>make_multiplier(n)</code>，返回一个乘以n的闭包函数。<br>例如：<code>f = make_multiplier(3)</code>，则 <code>f(5)</code> 返回 <code>15</code>。<br><br>写出你的答案后发给我，我会帮你批改并给出详细解析！💪"}
+,"学习路径":{agent:"planner",tag:"🗺️ 规划Agent",cls:"planner",reply:"<span class='agent-tag planner'>🗺️ 规划Agent</span>根据你的学习数据，为你定制以下路径：<br><br>✅ <b>阶段1：Python基础语法</b>（已完成 · 95%）<br>• 变量、常量、注释<br>• 基本数据类型<br><br>✅ <b>阶段2：控制流</b>（进行中 · 70%）<br>• if/elif/else 条件判断<br>• for/while 循环结构<br>• break/continue/pass<br><br>📋 <b>阶段3：函数与模块</b>（未开始）<br>• 函数定义与调用<br>• 参数传递机制<br>• 模块导入与使用<br>• 标准库简介<br><br>📋 <b>阶段4：面向对象</b>（未开始）<br>• 类与对象<br>• 封装/继承/多态<br>• 特殊方法 __init__ 等<br><br>📋 <b>阶段5：进阶主题</b>（未开始）<br>• 装饰器与闭包<br>• 生成器与迭代器<br>• 异常处理<br>• 文件操作<br><br>📅 <b>预计总学习时长：40小时</b><br>建议每天学习1-2小时，周末增加练习时间。"}
+,"评估":{agent:"evaluator",tag:"📊 评估Agent",cls:"evaluator",reply:"<span class='agent-tag evaluator'>📊 评估Agent</span>你的最新学习评估报告：<br><br>📈 <b>综合评分：72分</b> ⭐⭐⭐⭐<br><br><b>各维度掌握度：</b><br>• 基础知识：██████░░░░ 60%<br>• 数据类型：█████░░░░░ 50%<br>• 控制流：███████░░░ 70%<br>• 函数：████░░░░░░ 40%<br>• 面向对象：██░░░░░░░░ 20%<br><br>🎯 <b>薄弱点分析</b><br>• 函数参数传递方式理解不够深入<br>• 递归和闭包概念较为模糊<br>• 装饰器尚未接触<br><br>📅 <b>本周建议</b><br>• 完成函数章节的3道练习题<br>• 观看Python函数精讲视频<br>• 重点攻克 *args 和 **kwargs<br><br>继续保持，你进步很快！🚀"}
+,"默认":{agent:"coordinator",tag:"🤖 协调Agent",cls:"coordinator",reply:"<span class='agent-tag coordinator'>🤖 协调Agent</span>收到你的问题！让我帮你分析一下...<br><br>这个问题涉及多个知识点，我已经协调相关Agent为你准备最佳答案了。<br><br>💡 <b>小贴士</b>：你可以尝试更具体的问题描述，比如：<br>• &quot;帮我讲解XXX&quot; → 导师Agent<br>• &quot;生成XXX思维导图&quot; → 知识图谱Agent<br>• &quot;出几道XXX练习题&quot; → 评估Agent<br>• &quot;规划XXX学习路径&quot; → 规划Agent<br><br>试试点击快捷按钮，或者直接告诉我你想学的内容吧！📚"}
+};
+
+// ===== 智能路由 =====
+function findReply(text){
+  var lower=text.toLowerCase();
+  if(/函数|def|参数|return|lambda|装饰器|闭包/.test(lower)) return KB["Python函数"];
+  if(/思维导|脑图|结构|框架|知识图谱|知识点/.test(lower)) return KB["思维导图"];
+  if(/练习|做题|题目|习题|考考|测验|测评/.test(lower)) return KB["练习"];
+  if(/路径|路线|计划|规划|学习路线|安排/.test(lower)) return KB["学习路径"];
+  if(/评估|评价|打分|报告|进度|掌握|水平/.test(lower)) return KB["评估"];
+  if(/控制流|if|for|while|循环|条件/.test(lower)) return KB["学习路径"];
+  if(/复习|巩固|回顾/.test(lower)) return KB["练习"];
+  return KB["默认"];
+}
+
+// ===== 当前选中的Agent =====
+var currentAgent='all';
+function switchAgent(agent){
+  currentAgent=agent;
+  document.querySelectorAll('.agent-switcher button').forEach(function(b){b.classList.remove('active')});
+  event.target.classList.add('active');
+}
+
+// ===== 发送消息 =====
+function sendMessage(){
+  var input=document.getElementById('input');
+  var text=input.value.trim();
+  if(!text) return;
+  input.value='';
+  addMsg(text,'user');
+  showTyping();
+  setTimeout(function(){
+    removeTyping();
+    var reply=findReply(text);
+    if(currentAgent!=='all'&&reply.agent!==currentAgent){
+      var coord=KB["默认"];
+      addMsg(coord.tag+' 已转发给 '+reply.tag+' 处理中...<br><br>'+reply.reply,'bot');
+    }else{
+      addMsg(reply.reply,'bot');
+    }
+    updateStats();
+  },800+Math.random()*600);
+}
+
+function sendQuick(text){
+  document.getElementById('input').value=text;
+  sendMessage();
+}
+
+// ===== 消息渲染 =====
+function addMsg(html,type){
+  var div=document.createElement('div');
+  div.className='msg '+type;
+  div.innerHTML=html;
+  document.getElementById('messages').appendChild(div);
+  scrollChat();
+}
+
+function showTyping(){
+  var div=document.createElement('div');
+  div.className='msg bot';
+  div.id='typingMsg';
+  div.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>';
+  document.getElementById('messages').appendChild(div);
+  scrollChat();
+}
+
+function removeTyping(){
+  var el=document.getElementById('typingMsg');
+  if(el)el.remove();
+}
+
+function scrollChat(){
+  var m=document.getElementById('messages');
+  m.scrollTop=m.scrollHeight;
+}
+
+// ===== 统计更新 =====
+function updateStats(){
+  var score=parseInt(document.getElementById('statScore').textContent);
+  if(score<100){
+    document.getElementById('statScore').textContent=score+1;
+  }
+}
+
+// ===== 资源标签切换 =====
+function switchTab(type,btn){
+  document.querySelectorAll('.resource-tabs button').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  document.querySelectorAll('.resource-item').forEach(function(item){
+    if(item.getAttribute('data-type')===type||type==='all'){
+      item.style.display='flex';
+    }else{
+      item.style.display='none';
+    }
+  });
+}
+
+// ===== 雷达图绘制 =====
+function drawRadar(){
+  var canvas=document.getElementById('radarChart');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var rect=canvas.parentElement.getBoundingClientRect();
+  canvas.width=rect.width*2;
+  canvas.height=rect.height*2;
+  ctx.scale(2,2);
+  var w=rect.width,h=rect.height;
+  var cx=w/2,cy=h/2-10,r=Math.min(cx,cy)-35;
+  var dims=[
+    {label:'基础知识',val:0.60,color:'#6c5ce7'},
+    {label:'数据类型',val:0.50,color:'#00cec9'},
+    {label:'控制流',val:0.70,color:'#00b894'},
+    {label:'函数',val:0.40,color:'#fdcb6e'},
+    {label:'面向对象',val:0.20,color:'#ff7675'}
+  ];
+  var n=dims.length;
+  // 网格
+  for(var ring=1;ring<=4;ring++){
+    var rr=r*ring/4;
+    ctx.beginPath();
+    for(var i=0;i<=n;i++){
+      var a=(Math.PI*2*i/n)-Math.PI/2;
+      var x=cx+rr*Math.cos(a),y=cy+rr*Math.sin(a);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    if(ring<4){
+      ctx.fillStyle='rgba(255,255,255,0.02)';
+      ctx.fill();
+    }
+  }
+  // 轴线
+  dims.forEach(function(_,i){
+    var a=(Math.PI*2*i/n)-Math.PI/2;
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));
+    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.stroke();
+  });
+  // 数据区域
+  ctx.beginPath();
+  dims.forEach(function(d,i){
+    var a=(Math.PI*2*i/n)-Math.PI/2;
+    var x=cx+r*d.val*Math.cos(a),y=cy+r*d.val*Math.sin(a);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle='rgba(108,92,231,0.15)';
+  ctx.fill();
+  ctx.strokeStyle='rgba(108,92,231,0.6)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+  // 数据点+标签
+  dims.forEach(function(d,i){
+    var a=(Math.PI*2*i/n)-Math.PI/2;
+    var x=cx+r*d.val*Math.cos(a),y=cy+r*d.val*Math.sin(a);
+    // 点
+    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fillStyle=d.color;ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;ctx.stroke();
+    // 标签
+    var lx=cx+(r+18)*Math.cos(a),ly=cy+(r+18)*Math.sin(a);
+    ctx.fillStyle='#ccc';ctx.font='11px -apple-system,"Microsoft YaHei",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(d.label,lx,ly);
+    // 数值
+    ctx.fillStyle=d.color;ctx.font='bold 10px sans-serif';
+    ctx.fillText(Math.round(d.val*100)+'%',lx,ly+12);
+  });
+}
+
+// ===== 窗口自适应 =====
+window.addEventListener('resize',function(){drawRadar()});
+window.addEventListener('load',function(){drawRadar()});
+
+// ===== 键盘快捷键 =====
+document.addEventListener('keydown',function(e){
+  if(e.key==='/'&&document.activeElement.tagName!=='INPUT'){
+    e.preventDefault();
+    document.getElementById('input').focus();
+  }
+});
+</script>
+</body>
+</html>
