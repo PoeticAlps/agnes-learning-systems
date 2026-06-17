@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知声 - 语音知识图谱学习伴侣</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#4A148C;--primary-light:#7B1FA2;--bg:#FFF8E1;--card:#fff}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f0e8;height:100vh;display:flex;flex-direction:column}
+.header{background:var(--primary);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.tabs{display:flex;background:#fff;border-bottom:2px solid #eee}
+.tab{flex:1;padding:12px;text-align:center;cursor:pointer;font-size:14px;color:#666;border-bottom:3px solid transparent}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.main{flex:1;overflow:hidden}
+.page{display:none;height:100%;overflow-y:auto;padding:20px}
+.page.active{display:block}
+/* 录音管理 */
+.upload-area{border:2px dashed #ccc;border-radius:12px;padding:40px;text-align:center;margin-bottom:20px;background:#fafafa}
+.upload-area.dragover{border-color:var(--primary);background:#f3e5f5}
+.rec-list{display:flex;flex-direction:column;gap:8px}
+.rec-item{display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.rec-item .icon{width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center}
+.rec-item .info{flex:1}
+.rec-item .info .title{font-weight:600;font-size:14px}
+.rec-item .info .meta{font-size:12px;color:#999}
+.rec-item .status{padding:4px 10px;border-radius:12px;font-size:12px}
+.rec-item .status.done{background:#e8f5e9;color:#2e7d32}
+.rec-item .status.pending{background:#fff3e0;color:#e65100}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-sm{padding:5px 12px;font-size:12px}
+/* 知识图谱 */
+#graphContainer{width:100%;height:500px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+/* 卡片复习 */
+.card-container{max-width:500px;margin:0 auto}
+.review-card{background:#fff;border-radius:16px;padding:30px;box-shadow:0 4px 16px rgba(0,0,0,.1);text-align:center;min-height:200px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform .3s}
+.review-card:hover{transform:translateY(-2px)}
+.review-card .type{font-size:12px;color:var(--primary);margin-bottom:12px}
+.review-card .content{font-size:18px;line-height:1.6}
+.review-card .answer{display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;color:#2e7d32}
+.review-card.flipped .answer{display:block}
+.feedback-btns{display:flex;gap:8px;margin-top:20px;justify-content:center}
+.feedback-btns button{padding:10px 20px;border:2px solid #ddd;background:#fff;border-radius:24px;cursor:pointer;font-size:14px;transition:all .2s}
+.feedback-btns button:hover{border-color:var(--primary);color:var(--primary)}
+.feedback-btns .easy{border-color:#4CAF50;color:#4CAF50}
+.feedback-btns .forgot{border-color:#f44336;color:#f44336}
+/* 智能问答 */
+.qa-container{max-width:700px;margin:0 auto;display:flex;flex-direction:column;height:100%}
+.qa-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:10px 0}
+.qa-msg{max-width:80%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.6}
+.qa-msg.user{align-self:flex-end;background:var(--primary);color:#fff}
+.qa-msg.bot{align-self:flex-start;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.qa-msg .source{font-size:12px;color:#999;margin-top:6px;padding-top:4px;border-top:1px solid #eee}
+.qa-input{display:flex;gap:8px;padding:10px 0}
+.qa-input input{flex:1;border:1px solid #ddd;border-radius:24px;padding:10px 16px;font-size:14px;outline:none}
+.qa-input input:focus{border-color:var(--primary)}
+/* 统计 */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.stat-card .number{font-size:32px;font-weight:700;color:var(--primary)}
+.stat-card .label{font-size:13px;color:#999;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="header"><span style="font-size:22px">🎙️</span><h1 style="font-size:16px">知声 · 语音知识图谱学习伴侣</h1></div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">🎙️ 录音管理</div>
+  <div class="tab" onclick="switchTab(1)">📊 知识图谱</div>
+  <div class="tab" onclick="switchTab(2)">🃏 卡片复习</div>
+  <div class="tab" onclick="switchTab(3)">💬 智能问答</div>
+  <div class="tab" onclick="switchTab(4)">📈 学习统计</div>
+</div>
+<div class="main">
+  <!-- Tab 0: 录音管理 -->
+  <div class="page active" id="page0">
+    <div class="upload-area" id="dropZone" ondrop="handleDrop(event)" ondragover="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')">
+      <p style="font-size:40px;margin-bottom:8px">📁</p>
+      <p style="font-size:16px;margin-bottom:8px">拖拽录音文件到这里，或</p>
+      <label class="btn btn-primary" style="cursor:pointer">选择文件<input type="file" accept="audio/*" style="display:none" onchange="uploadFile(this.files[0])"></label>
+      <p style="font-size:12px;color:#999;margin-top:8px">支持 mp3/wav/m4a 格式</p>
+    </div>
+    <h3 style="margin-bottom:12px">📋 录音列表</h3>
+    <div class="rec-list" id="recList">
+      <div class="rec-item"><div class="icon">🎤</div><div class="info"><div class="title">旅游心理学 - 第三章</div><div class="meta">2026-06-01 · 45分钟</div></div><div class="status done">已转写</div><button class="btn btn-primary btn-sm" onclick="extractKnowledge(1)">提取知识点</button></div>
+    </div>
+  </div>
+  <!-- Tab 1: 知识图谱 -->
+  <div class="page" id="page1">
+    <h3 style="margin-bottom:12px">📊 课程知识图谱</h3>
+    <select id="courseSelect" onchange="loadGraph()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;margin-bottom:16px">
+      <option>旅游心理学</option>
+      <option>导游业务</option>
+      <option>酒店管理概论</option>
+    </select>
+    <div id="graphContainer"></div>
+  </div>
+  <!-- Tab 2: 卡片复习 -->
+  <div class="page" id="page2">
+    <div class="card-container">
+      <p style="text-align:center;color:#999;margin-bottom:16px" id="cardCount">今日待复习：5张</p>
+      <div class="review-card" id="reviewCard" onclick="flipCard()">
+        <div class="type" id="cardType">📋 概念卡</div>
+        <div class="content" id="cardFront">什么是游客动机？</div>
+        <div class="answer" id="cardBack">游客动机是推动人们进行旅游活动的内在心理驱动力，包括推力因素和拉力因素。</div>
+      </div>
+      <div class="feedback-btns">
+        <button class="forgot" onclick="submitFeedback('forgot')">😵 忘了</button>
+        <button onclick="submitFeedback('hard')">😓 难</button>
+        <button onclick="submitFeedback('okay')">😐 还行</button>
+        <button class="easy" onclick="submitFeedback('easy')">😊 简单</button>
+      </div>
+    </div>
+  </div>
+  <!-- Tab 3: 智能问答 -->
+  <div class="page" id="page3">
+    <div class="qa-container">
+      <div class="qa-messages" id="qaMessages">
+        <div class="qa-msg bot">你好！我是知声学习助手 🎙️ 你可以问我关于课程内容的问题，我会引用录音原文来回答。<br><div class="source">💡 试试问："老师上课说的推力因素包括哪些？"</div></div>
+      </div>
+      <div class="qa-input">
+        <input id="qaInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')askQuestion()">
+        <button class="btn btn-primary" onclick="askQuestion()">提问</button>
+      </div>
+    </div>
+  </div>
+  <!-- Tab 4: 学习统计 -->
+  <div class="page" id="page4">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="number" id="statTotal">0</div><div class="label">总复习卡片数</div></div>
+      <div class="stat-card"><div class="number" id="statMastery">0%</div><div class="label">掌握率</div></div>
+      <div class="stat-card"><div class="number" id="statStreak">0</div><div class="label">连续复习天数</div></div>
+      <div class="stat-card"><div class="number" id="statDue">0</div><div class="label">今日待复习</div></div>
+    </div>
+    <h3 style="margin-bottom:12px">📊 掌握度趋势</h3>
+    <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+      <canvas id="trendChart" width="600" height="200"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const API='http://localhost:8000/zhisheng';
+let studentId='stu_'+Date.now();
+
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
+  document.querySelectorAll('.page').forEach((p,j)=>p.classList.toggle('active',j===i));
+  if(i===4)loadStats();
+}
+
+// 录音上传
+async function uploadFile(file){
+  if(!file)return;
+  const fd=new FormData();
+  fd.append('file',file);
+  fd.append('student_id',studentId);
+  fd.append('course_name','旅游心理学');
+  try{
+    const r=await fetch(`${API}/upload_audio`,{method:'POST',body:fd});
+    const d=await r.json();
+    alert(`上传成功！录音ID: ${d.recording_id}`);
+  }catch(e){alert('上传失败: '+e.message)}
+}
+function handleDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])uploadFile(e.dataTransfer.files[0])}
+
+// 知识图谱（简化版 - 用CSS渲染节点）
+async function loadGraph(){
+  const course=document.getElementById('courseSelect').value;
+  try{
+    const r=await fetch(`${API}/knowledge_graph/${encodeURIComponent(course)}`);
+    const d=await r.json();
+    renderGraph(d);
+  }catch(e){document.getElementById('graphContainer').innerHTML='<p style="padding:20px;color:#999">暂无图谱数据，请先上传录音并提取知识点</p>'}
+}
+function renderGraph(data){
+  const c=document.getElementById('graphContainer');
+  if(!data.nodes||!data.nodes.length){c.innerHTML='<p style="padding:20px;color:#999">暂无图谱数据</p>';return}
+  let html='<div style="padding:20px">';
+  data.nodes.forEach(n=>{
+    const color=n.type==='course'?'#4A148C':n.type==='knowledge_point'?'#7B1FA2':'#CE93D8';
+    html+=`<span style="display:inline-block;margin:6px;padding:8px 16px;background:${color};color:#fff;border-radius:20px;font-size:13px">${n.label}</span>`;
+  });
+  html+='</div>';
+  c.innerHTML=html;
+}
+
+// 卡片复习
+let currentCards=[],currentIdx=0;
+async function loadCards(){
+  try{
+    const r=await fetch(`${API}/review_cards/${studentId}`);
+    currentCards=await r.json();
+    currentIdx=0;
+    showCard();
+  }catch(e){}
+}
+function showCard(){
+  if(!currentCards.length){document.getElementById('cardFront').textContent='🎉 今日复习已完成！';document.getElementById('cardBack').textContent='';return}
+  const c=currentCards[currentIdx];
+  document.getElementById('cardType').textContent=c.card_type==='concept'?'📋 概念卡':c.card_type==='fill_blank'?'✏️ 填空卡':'✅ 判断卡';
+  document.getElementById('cardFront').textContent=c.front;
+  document.getElementById('cardBack').textContent=c.back;
+  document.getElementById('reviewCard').classList.remove('flipped');
+  document.getElementById('cardCount').textContent=`${currentIdx+1}/${currentCards.length}`;
+}
+function flipCard(){document.getElementById('reviewCard').classList.toggle('flipped')}
+async function submitFeedback(fb){
+  if(!currentCards.length)return;
+  const c=currentCards[currentIdx];
+  try{await fetch(`${API}/review`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:c.card_id,student_id:studentId,feedback:fb})})}catch(e){}
+  currentIdx++;
+  showCard();
+}
+
+// 智能问答
+async function askQuestion(){
+  const input=document.getElementById('qaInput');
+  const q=input.value.trim();if(!q)return;
+  input.value='';
+  addQAMsg(q,'user');
+  try{
+    const r=await fetch(`${API}/ask`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:studentId,question:q})});
+    const d=await r.json();
+    addQAMsg(d.answer,'bot',d.sources);
+  }catch(e){addQAMsg('网络错误','bot')}
+}
+function addQAMsg(t,r,sources){
+  const d=document.createElement('div');d.className='qa-msg '+r;
+  let html=t;
+  if(sources&&sources.length)html+='<div class="source">📖 来源：'+sources.map(s=>s.title).join(', ')+'</div>';
+  d.innerHTML=html;
+  document.getElementById('qaMessages').appendChild(d);
+  d.scrollIntoView({behavior:'smooth'});
+}
+
+// 统计
+async function loadStats(){
+  try{
+    const r=await fetch(`${API}/stats/${studentId}`);
+    const d=await r.json();
+    document.getElementById('statTotal').textContent=d.total_reviews||0;
+    document.getElementById('statMastery').textContent=(d.mastery_rate||0)+'%';
+    document.getElementById('statStreak').textContent=d.streak_days||0;
+    document.getElementById('statDue').textContent=d.cards_due_today||0;
+  }catch(e){}
+}
+
+// 初始化
+loadCards();
+</script>
+</body>
+</html>
