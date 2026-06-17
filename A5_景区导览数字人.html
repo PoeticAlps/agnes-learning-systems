@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小桂 - 桂林山水AI导游数字人</title>
+    <style>
+        :root {
+            --primary: #2E7D32;
+            --primary-light: #4CAF50;
+            --primary-dark: #1B5E20;
+            --cloud-white: #FAFAFA;
+            --cloud-gray: #F5F5F5;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --border: #E0E0E0;
+            --shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --radius: 12px;
+            --avatar-size: 180px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 50%, #A5D6A7 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .header h1 .icon { font-size: 24px; }
+        .header-actions { display: flex; gap: 12px; }
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .header-btn:hover { background: rgba(255,255,255,0.35); }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            min-height: calc(100vh - 56px);
+        }
+        .digital-human-panel {
+            background: var(--cloud-white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .avatar-container {
+            position: relative;
+            width: var(--avatar-size);
+            height: var(--avatar-size);
+            margin: 8px 0;
+        }
+        .avatar-ring {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 3px solid var(--primary-light);
+            opacity: 0.4;
+            animation: ring-pulse 3s ease-in-out infinite;
+        }
+        .avatar-ring.active {
+            border-color: var(--primary);
+            opacity: 0.8;
+            animation: ring-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes ring-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.4; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+        .avatar-face {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #C8E6C9, #81C784);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(46,125,50,0.3);
+        }
+        .eyes { display: flex; gap: 28px; margin-top: -10px; }
+        .eye {
+            width: 20px;
+            height: 20px;
+            background: #333;
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .eye::after {
+            content: '';
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            background: white;
+            border-radius: 50%;
+            top: 4px;
+            left: 4px;
+        }
+        .eye.blink { animation: blink 4s infinite; }
+        @keyframes blink {
+            0%, 95%, 100% { transform: scaleY(1); }
+            97% { transform: scaleY(0.1); }
+        }
+        .avatar-face.happy .eye { height: 10px; border-radius: 10px 10px 0 0; }
+        .avatar-face.thinking .eye:first-child { height: 16px; }
+        .avatar-face.thinking .eye:last-child { height: 24px; }
+        .avatar-face.surprised .eye { width: 26px; height: 26px; }
+        .mouth {
+            width: 30px;
+            height: 15px;
+            margin-top: 16px;
+            background: #D32F2F;
+            border-radius: 0 0 50% 50%;
+            transition: all 0.3s;
+        }
+        .mouth.speaking { animation: speak 0.3s infinite alternate; }
+        @keyframes speak {
+            0% { height: 8px; width: 26px; }
+            50% { height: 18px; width: 32px; }
+            100% { height: 12px; width: 28px; }
+        }
+        .avatar-face.happy .mouth { width: 40px; height: 20px; border-radius: 0 0 50% 50%; }
+        .avatar-face.thinking .mouth { width: 20px; height: 6px; border-radius: 3px; transform: translateX(10px); }
+        .avatar-face.surprised .mouth { width: 22px; height: 22px; border-radius: 50%; }
+        .cheeks { display: flex; gap: 50px; position: absolute; top: 55%; }
+        .cheek {
+            width: 24px;
+            height: 12px;
+            background: rgba(255,138,128,0.5);
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .avatar-face.happy .cheek { opacity: 1; }
+        .hair-accent {
+            position: absolute;
+            top: 8px;
+            right: 30px;
+            width: 30px;
+            height: 30px;
+            background: #FFD54F;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(45deg);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .status-text { font-size: 13px; color: var(--text-secondary); text-align: center; }
+        .status-text.active { color: var(--primary); font-weight: 500; }
+        .action-badge {
+            background: var(--primary-light);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .action-badge.visible { opacity: 1; }
+        .chat-panel {
+            background: var(--cloud-white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 0;
+        }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .message {
+            display: flex;
+            gap: 10px;
+            max-width: 85%;
+            animation: msg-in 0.3s ease-out;
+        }
+        @keyframes msg-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.assistant { align-self: flex-start; }
+        .msg-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .message.assistant .msg-avatar { background: linear-gradient(135deg, #C8E6C9, #81C784); }
+        .message.user .msg-avatar { background: linear-gradient(135deg, #BBDEFB, #64B5F6); }
+        .msg-bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .message.assistant .msg-bubble { background: var(--cloud-gray); border-bottom-left-radius: 4px; }
+        .message.user .msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--cloud-gray);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+        }
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+        .quick-actions {
+            padding: 12px 20px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            border-top: 1px solid var(--border);
+            background: var(--cloud-white);
+        }
+        .quick-btn {
+            background: var(--cloud-gray);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+        .quick-btn:hover { background: var(--primary-light); color: white; border-color: var(--primary-light); }
+        .chat-input-area {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            background: white;
+        }
+        .chat-input {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 10px 16px;
+            font-size: 14px;
+            outline: none;
+            resize: none;
+            max-height: 100px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus { border-color: var(--primary-light); }
+        .chat-input::placeholder { color: #BDBDBD; }
+        .send-btn, .voice-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .send-btn { background: var(--primary); color: white; }
+        .send-btn:hover { background: var(--primary-dark); transform: scale(1.05); }
+        .send-btn:disabled { background: #BDBDBD; cursor: not-allowed; transform: none; }
+        .voice-btn { background: var(--cloud-gray); color: var(--text-secondary); border: 1px solid var(--border); }
+        .voice-btn:hover { background: #E8F5E9; color: var(--primary); }
+        .voice-btn.recording { background: #FFCDD2; color: #D32F2F; border-color: #EF9A9A; animation: pulse-red 1s infinite; }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.4); } 50% { box-shadow: 0 0 0 8px rgba(211,47,47,0); } }
+        .welcome-card {
+            background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+            border: 1px solid #A5D6A7;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+        .welcome-card h3 { color: var(--primary-dark); margin-bottom: 6px; font-size: 15px; }
+        .welcome-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+        .agent-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-bottom: 6px; background: #E8F5E9; color: var(--primary); }
+        @media (max-width: 768px) {
+            .main-container { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+            :root { --avatar-size: 100px; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <h1><span class="icon">🏔️</span> 小桂 - 桂林山水AI导游</h1>
+    <div class="header-actions">
+        <button class="header-btn" onclick="showStats()">📊 运营数据</button>
+        <button class="header-btn" onclick="showAbout()">ℹ️ 关于</button>
+    </div>
+</header>
+
+<div class="main-container">
+    <aside class="digital-human-panel">
+        <div class="panel-title">🎤 AI导游数字人</div>
+        <div class="avatar-container">
+            <div class="avatar-ring" id="avatarRing"></div>
+            <div class="avatar-face" id="avatarFace">
+                <div class="hair-accent"></div>
+                <div class="eyes">
+                    <div class="eye blink"></div>
+                    <div class="eye blink"></div>
+                </div>
+                <div class="cheeks">
+                    <div class="cheek"></div>
+                    <div class="cheek"></div>
+                </div>
+                <div class="mouth" id="mouth"></div>
+            </div>
+        </div>
+        <div class="status-text" id="statusText">等待您的问题...</div>
+        <div class="action-badge" id="actionBadge">👋 挥手</div>
+        <div style="width:100%">
+            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">快捷功能</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="quick-btn" onclick="sendQuick('帮我推荐桂林必去的景点')" style="text-align:left;">🏔️ 景点推荐</button>
+                <button class="quick-btn" onclick="sendQuick('帮我规划一日游路线')" style="text-align:left;">🗺️ 路线规划</button>
+                <button class="quick-btn" onclick="sendQuick('各景点的开放时间和票价是多少？')" style="text-align:left;">🕐 开放时间</button>
+                <button class="quick-btn" onclick="sendQuick('桂林有什么特色美食推荐？')" style="text-align:left;">🍜 美食推荐</button>
+                <button class="quick-btn" onclick="sendQuick('拍照最佳地点和时间？')" style="text-align:left;">📸 摄影攻略</button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="chat-panel">
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-card">
+                <h3>👋 你好！我是小桂</h3>
+                <p>桂林山水的AI导游数字人。我可以为你介绍景点、规划路线、推荐美食，有任何关于桂林旅游的问题都可以问我哦~</p>
+            </div>
+            <div class="message assistant">
+                <div class="msg-avatar">🏔️</div>
+                <div class="msg-bubble">
+                    你好呀！欢迎来到桂林~ 🌿 我是小桂，你的专属AI导游。<br><br>
+                    你可以问我：<br>
+                    • 桂林有哪些必去的景点？<br>
+                    • 帮我规划一条一日游路线<br>
+                    • 漓江竹筏怎么预订？<br>
+                    • 桂林有什么好吃的？<br><br>
+                    或者点击左边的快捷按钮开始吧！
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <button class="quick-btn" onclick="sendQuick('推荐桂林最美的自然景观')">🌿 自然景观</button>
+            <button class="quick-btn" onclick="sendQuick('桂林有哪些历史文化景点？')">📜 历史文化</button>
+            <button class="quick-btn" onclick="sendQuick('帮我规划半日游路线')">⏰ 半日游</button>
+            <button class="quick-btn" onclick="sendQuick('帮我规划一日游路线')">📅 一日游</button>
+            <button class="quick-btn" onclick="sendQuick('帮我规划两日游路线')">🗓️ 两日游</button>
+            <button class="quick-btn" onclick="sendQuick('桂林最佳旅游季节是什么时候？')">🌤️ 最佳季节</button>
+        </div>
+
+        <div class="chat-input-area">
+            <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="语音输入">🎙️</button>
+            <textarea class="chat-input" id="chatInput" placeholder="输入你的问题，如：桂林有什么好玩的？" rows="1" onkeydown="handleKeyDown(event)"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+        </div>
+    </main>
+</div>
+
+<script>
+// ========== 内置知识库 ==========
+const SCENIC_SPOTS = {
+    "漓江": {
+        desc: "桂林山水的灵魂！漓江全长160公里，从桂林到阳朔的83公里精华段被誉为'百里画廊'。",
+        ticket: "竹筏票价：90-165元/人；游船票价：215-290元/人",
+        time: "全年开放，6:00-18:00",
+        tips: "建议坐竹筏，最接近'舟行碧波上，人在画中游'的体验。杨堤-兴坪段最美。",
+        photo: "九马画山、黄布倒影（20元人民币背景）是最佳拍摄点。清晨6-7点和下午4-5点光线最佳。"
+    },
+    "象鼻山": {
+        desc: "桂林城徽！因酷似一头巨象伸长鼻子临江汲水而得名，是桂林山水的象征。",
+        ticket: "免费开放（2019年起免门票）",
+        time: "全天开放",
+        tips: "最佳观赏角度：正对面广场。晚上有灯光秀。",
+        photo: "傍晚拍剪影最美，夜晚灯光下的象鼻山也很壮观。"
+    },
+    "两江四湖": {
+        desc: "桂林市区的水系景观，漓江、桃花江与杉湖、榕湖、西湖、桂湖连通而成。",
+        ticket: "夜游船票：210元起",
+        time: "游船班次：19:30、20:30",
+        tips: "推荐夜游，可以看到日月双塔、解放桥夜景。",
+        photo: "日月双塔夜景是必拍打卡点！"
+    },
+    "龙脊梯田": {
+        desc: "世界三大梯田奇观之一！始建于元朝，完工于清初，距今约650年历史。",
+        ticket: "门票80元/人（含观光车）",
+        time: "全年开放，最佳季节：4月灌水期/9月丰收期",
+        tips: "金坑大寨最大、设施最全；平安寨开发最早、交通最方便。",
+        photo: "4-5月如层层银梯，9-10月金碧辉煌。日出在金坑大寨金佛顶。"
+    },
+    "阳朔西街": {
+        desc: "桂林阳朔镇的主要街道，始建于公元古代，1000多年历史。中西文化碰撞的浪漫之地。",
+        ticket: "免费",
+        time: "全天开放，夜晚最热闹",
+        tips: "晚上有很多酒吧、餐厅、小店，适合散步。",
+        photo: "夜晚霓虹灯下的西街很有氛围感。"
+    },
+    "遇龙河": {
+        desc: "桂林最美的人工漂流，比漓江更宁静秀美，被称为'小漓江'。",
+        ticket: "竹筏漂流：260-360元/筏（限4人）",
+        time: "7:30-17:00",
+        tips: "推荐万景-工农桥段，风景最好。比漓江竹筏便宜且更原生态。",
+        photo: "田园风光+碧水青山，随手一拍就是大片！"
+    }
+};
+
+const FOOD_RECOMMENDATIONS = [
+    { name: "桂林米粉", desc: "桂林名片！卤水是灵魂，配上酸豆角、花生、辣椒，绝了！", price: "5-15元" },
+    { name: "啤酒鱼", desc: "阳朔招牌菜，用漓江鲜鱼加上啤酒焖制，肉质鲜嫩。", price: "60-120元" },
+    { name: "荔浦芋扣肉", desc: "桂林传统名菜，荔浦芋头+五花肉，肥而不腻。", price: "45-80元" },
+    { name: "恭城油茶", desc: "桂林特色饮品，茶叶+生姜捶打熬制，配各种佐料。", price: "10-20元" },
+    { name: "松花糖", desc: "桂林特产小吃，香甜酥脆，适合当伴手礼。", price: "10-30元" }
+];
+
+const ROUTES = {
+    "半日": {
+        title: "桂林市区半日游",
+        duration: "约4-5小时",
+        stops: [
+            { spot: "象鼻山公园", time: "1.5小时", desc: "打卡桂林城徽，拍照留念" },
+            { spot: "两江四湖夜游", time: "1.5小时", desc: "乘船欣赏桂林夜景，看日月双塔" },
+            { spot: "东西巷/正阳步行街", time: "1小时", desc: "品尝桂林米粉和小吃" }
+        ]
+    },
+    "一日": {
+        title: "桂林经典一日游",
+        duration: "约8-10小时",
+        stops: [
+            { spot: "象鼻山", time: "09:00-10:00", desc: "上午打卡城徽" },
+            { spot: "芦笛岩", time: "10:30-11:30", desc: "地下溶洞奇观" },
+            { spot: "漓江竹筏（杨堤-兴坪）", time: "12:00-15:00", desc: "精华段漂流，百里画廊" },
+            { spot: "阳朔西街", time: "18:00-20:00", desc: "晚餐+夜逛西街" }
+        ]
+    },
+    "两日": {
+        title: "桂林阳朔两日游",
+        duration: "约2天",
+        stops: [
+            { spot: "Day1: 象鼻山 + 两江四湖 + 东西巷", time: "Day1", desc: "桂林市区经典打卡" },
+            { spot: "Day2: 漓江竹筏 + 遇龙河 + 阳朔", time: "Day2", desc: "漓江精华+遇龙河漂流+西街夜景" }
+        ]
+    }
+};
+
+// ========== 对话匹配 ==========
+function findReply(text) {
+    const t = text.toLowerCase();
+    
+    // 景点推荐
+    if (/景点|推荐|好玩|必去|哪里/.test(t)) {
+        let spots = Object.keys(SCENIC_SPOTS).slice(0, 4);
+        return `<span class="agent-tag">🏔️ 景点推荐Agent</span>给你推荐桂林必去景点：<br><br>` +
+            spots.map((s, i) => `${i+1}. <b>${s}</b> - ${SCENIC_SPOTS[s].desc.substring(0, 30)}...`).join('<br>') +
+            `<br><br>想了解哪个景点的详情？告诉我名字就好~`;
+    }
+    
+    // 景点详情
+    for (let name in SCENIC_SPOTS) {
+        if (t.includes(name)) {
+            const s = SCENIC_SPOTS[name];
+            return `<span class="agent-tag">📖 景点详情Agent</span><b>${name}</b><br><br>` +
+                `📝 ${s.desc}<br><br>` +
+                `🎫 票价：${s.ticket}<br>` +
+                `🕐 时间：${s.time}<br>` +
+                `💡 小贴士：${s.tips}<br><br>` +
+                `📸 拍照攻略：${s.photo}`;
+        }
+    }
+    
+    // 路线规划
+    if (/路线|行程|游玩|规划|玩/.test(t)) {
+        if (/半日|半天/.test(t)) {
+            const r = ROUTES["半日"];
+            return `<span class="agent-tag">🗺️ 路线规划Agent</span><b>${r.title}</b> (${r.duration})<br><br>` +
+                r.stops.map(s => `• <b>${s.spot}</b>（${s.time}）<br>&nbsp;&nbsp;&nbsp;${s.desc}`).join('<br><br>') +
+                `<br><br>需要我详细展开哪个环节吗？`;
+        }
+        if (/两日|两天/.test(t)) {
+            const r = ROUTES["两日"];
+            return `<span class="agent-tag">🗺️ 路线规划Agent</span><b>${r.title}</b> (${r.duration})<br><br>` +
+                r.stops.map(s => `• <b>${s.spot}</b><br>&nbsp;&nbsp;&nbsp;${s.desc}`).join('<br><br>') +
+                `<br><br>需要我详细展开哪个环节吗？`;
+        }
+        // 一日游默认
+        const r = ROUTES["一日"];
+        return `<span class="agent-tag">🗺️ 路线规划Agent</span><b>${r.title}</b> (${r.duration})<br><br>` +
+            r.stops.map(s => `• <b>${s.spot}</b>（${s.time}）<br>&nbsp;&nbsp;&nbsp;${s.desc}`).join('<br><br>') +
+            `<br><br>需要我详细展开哪个环节吗？`;
+    }
+    
+    // 开放时间
+    if (/开放|时间|票价|多少钱|价格/.test(t)) {
+        let info = `<span class="agent-tag">🕐 信息查询Agent</span>主要景点信息汇总：<br><br>`;
+        for (let name in SCENIC_SPOTS) {
+            info += `<b>${name}</b><br>`;
+            info += `🎫 ${SCENIC_SPOTS[name].ticket}<br>`;
+            info += `🕐 ${SCENIC_SPOTS[name].time}<br><br>`;
+        }
+        return info;
+    }
+    
+    // 美食
+    if (/美食|吃的|吃饭|特色|小吃|餐馆/.test(t)) {
+        let foodHtml = `<span class="agent-tag">🍜 美食推荐Agent</span>桂林必吃美食：<br><br>`;
+        foodHtml += FOOD_RECOMMENDATIONS.map(f =>
+            `• <b>${f.name}</b> - ${f.desc}<br>&nbsp;&nbsp;&nbsp;💰 ${f.price}`
+        ).join('<br><br>');
+        return foodHtml;
+    }
+    
+    // 摄影
+    if (/拍照|摄影|照片|好看|打卡/.test(t)) {
+        return `<span class="agent-tag">📸 摄影攻略Agent</span>桂林最佳拍照攻略：<br><br>` +
+            `🌅 <b>最佳时段</b>：清晨6-7点、傍晚4-6点（黄金光线）<br><br>` +
+            `📍 <b>必拍机位</b>：<br>` +
+            `• 漓江·黄布倒影（20元人民币同款取景地）<br>` +
+            `• 象鼻山（正门广场拍全景，晚上拍灯光秀）<br>` +
+            `• 遇龙河（田园风光，竹筏上拍）<br>` +
+            `• 龙脊梯田（4月灌水期/9月丰收期最美）<br>` +
+            `• 日月双塔（两江四湖夜游必拍）<br><br>` +
+            `💡 建议带广角镜头，桂林山水适合拍大场景！`;
+    }
+    
+    // 自然景观
+    if (/自然|山水|风景/.test(t)) {
+        return `<span class="agent-tag">🌿 自然景观Agent</span>桂林自然风光精选：<br><br>` +
+            `🏔️ <b>喀斯特地貌</b>：桂林是世界喀斯特地貌典范，'桂林山水甲天下'<br>` +
+            `🌊 <b>漓江</b>：百里画廊，竹筏漂流是最经典的体验<br>` +
+            `🌾 <b>遇龙河</b>：更安静秀美的人工漂流<br>` +
+            `🏞️ <b>龙脊梯田</b>：千年农耕文明奇迹<br>` +
+            `🕳️ <b>溶洞奇观</b>：芦笛岩、七星岩，钟乳石千姿百态<br><br>` +
+            `推荐你坐竹筏游漓江，体验'舟行碧波上，人在画中游'！`;
+    }
+    
+    // 历史文化
+    if (/历史|文化|古迹|古迹/.test(t)) {
+        return `<span class="agent-tag">📜 历史文化Agent</span>桂林历史文化底蕴：<br><br>` +
+            `🏛️ <b>建城2200+</b>：秦始皇开凿灵渠，设桂林郡<br>` +
+            `📝 <b>文化名人</b>：韩愈、柳宗元、白居易等都曾到此<br>` +
+            `🏘️ <b>灵渠</b>：世界最古老的运河之一，2200年历史<br>` +
+            `🎭 <b>壮族文化</b>：山歌、绣球、三月三节庆<br>` +
+            `📖 <b>石刻文化</b>：摩崖石刻500余方，'桂海碑林'闻名中外<br><br>` +
+            `推荐去看看靖江王府和独秀峰！`;
+    }
+    
+    // 季节
+    if (/季节|什么时候|几月|天气|最佳/.test(t)) {
+        return `<span class="agent-tag">🌤️ 季节查询Agent</span>桂林四季皆美，各有特色：<br><br>` +
+            `🌸 <b>春季（3-5月）</b>：烟雨漓江，云雾缭绕，像水墨画<br>` +
+            `☀️ <b>夏季（6-8月）</b>：适合漂流，水温舒适，但要注意防晒<br>` +
+            `🍂 <b>秋季（9-11月）</b>：天高气爽，龙脊梯田金黄，最佳季节！<br>` +
+            `❄️ <b>冬季（12-2月）</b>：人少价低，偶尔有雪景，象鼻山雾凇<br><br>` +
+            `🏆 我个人推荐<b>4-5月</b>或<b>9-10月</b>来！`;
+    }
+    
+    // 默认
+    return `<span class="agent-tag">🤖 小桂</span>哎呀，这个问题小桂还在学习中呢~ 😅<br><br>` +
+        `不过你可以问我：<br>` +
+        `• 桂林有哪些必去景点？<br>` +
+        `• 帮我规划一日游路线<br>` +
+        `• 桂林有什么好吃的？<br>` +
+        `• 最佳旅游季节是什么时候？<br><br>` +
+        `试试这些话题吧~ 🌿`;
+}
+
+// ========== DOM ==========
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const voiceBtn = document.getElementById('voiceBtn');
+const avatarFace = document.getElementById('avatarFace');
+const avatarRing = document.getElementById('avatarRing');
+const mouth = document.getElementById('mouth');
+const statusText = document.getElementById('statusText');
+const actionBadge = document.getElementById('actionBadge');
+
+// ========== 消息发送 ==========
+function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    appendMessage('user', text);
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    sendBtn.disabled = true;
+    showTyping();
+    setStatus('正在思考中...', true);
+    const emotion = ['happy', 'thinking', 'neutral'][Math.floor(Math.random() * 3)];
+    const actions = ['wave', 'point', 'nod', 'explain'];
+    const action = actions[Math.floor(Math.random() * actions.length)];
+    setTimeout(() => {
+        removeTyping();
+        const reply = findReply(text);
+        appendMessage('assistant', reply);
+        setEmotion(emotion);
+        setAction(action);
+        setStatus('回答完毕', false);
+        sendBtn.disabled = false;
+        chatInput.focus();
+    }, 600 + Math.random() * 800);
+}
+
+function sendQuick(text) {
+    chatInput.value = text;
+    sendMessage();
+}
+
+function appendMessage(role, text) {
+    const div = document.createElement('div');
+    div.className = 'message ' + role;
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = role === 'assistant' ? '🏔️' : '👤';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = text.replace(/\n/g, '<br>');
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+    div.id = 'typingMsg';
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = '🏔️';
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    for (let i = 0; i < 3; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'typing-dot';
+        indicator.appendChild(dot);
+    }
+    div.appendChild(avatar);
+    div.appendChild(indicator);
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    mouth.classList.add('speaking');
+}
+
+function removeTyping() {
+    const el = document.getElementById('typingMsg');
+    if (el) el.remove();
+    mouth.classList.remove('speaking');
+}
+
+function setEmotion(emotion) {
+    avatarFace.classList.remove('happy', 'thinking', 'surprised', 'neutral');
+    avatarFace.classList.add(emotion || 'neutral');
+    const labels = { happy: '😊 开心', thinking: '🤔 思考中', surprised: '😲 惊叹', neutral: '😌 平和' };
+    statusText.textContent = labels[emotion] || '等待您的问题...';
+}
+
+function setAction(action) {
+    const labels = { wave: '👋 挥手', point: '👉 指引', nod: '😊 点头', explain: '📖 讲解' };
+    actionBadge.textContent = labels[action] || '🏔️ 待命';
+    actionBadge.classList.add('visible');
+    setTimeout(() => actionBadge.classList.remove('visible'), 3000);
+}
+
+function setStatus(text, active) {
+    statusText.textContent = text;
+    statusText.className = 'status-text' + (active ? ' active' : '');
+    if (active) avatarRing.classList.add('active');
+    else avatarRing.classList.remove('active');
+}
+
+// ========== 语音输入 ==========
+let isRecording = false;
+let mediaRecorder = null;
+let audioChunks = [];
+
+function toggleVoice() {
+    if (isRecording) stopRecording();
+    else startRecording();
+}
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            chatInput.value = '（语音识别：模拟功能，请打字输入）';
+            sendMessage();
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        voiceBtn.classList.add('recording');
+        voiceBtn.textContent = '⏹️';
+        setStatus('正在录音...', true);
+    } catch (err) {
+        chatInput.value = '无法访问麦克风，请打字输入~';
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    isRecording = false;
+    voiceBtn.classList.remove('recording');
+    voiceBtn.textContent = '🎙️';
+    setStatus('正在识别语音...', true);
+}
+
+// ========== 键盘事件 ==========
+function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+    setTimeout(() => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+    }, 0);
+}
+
+// ========== 运营数据弹窗 ==========
+function showStats() {
+    const stats = { visitors: 12847, questions: 3562, satisfaction: '96.8%', routes: 892, spots: 56 };
+    alert('📊 小桂AI导游 - 运营数据\n\n' +
+        '👥 今日访客：' + stats.visitors.toLocaleString() + '\n' +
+        '💬 今日问答：' + stats.questions.toLocaleString() + '\n' +
+        '😊 满意度：' + stats.satisfaction + '\n' +
+        '🗺️ 路线规划：' + stats.routes + '次\n' +
+        '📍 景点收录：' + stats.spots + '个');
+}
+
+// ========== 关于 ==========
+function showAbout() {
+    alert('小桂 - 桂林山水AI导游数字人 v1.0\n\n' +
+        '基于 RAG + 大语言模型的智能景区导览系统。\n' +
+        '支持自然语言问答、个性化路线推荐、语音交互。\n\n' +
+        '收录景点：漓江、象鼻山、两江四湖、龙脊梯田、遇龙河等\n' +
+        '美食推荐：桂林米粉、啤酒鱼、荔浦芋扣肉等\n' +
+        '路线规划：半日游/一日游/两日游多种方案');
+}
+
+// ========== 初始化 ==========
+chatInput.focus();
+</script>
+</body>
+</html>
