@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教学系统原型集 · AI+教育</title>
+<style>
+:root{
+  --primary:#2E7D32;--primary-light:#4CAF50;--primary-dark:#1B5E20;
+  --ink:#1B3A1E;--muted:#5f7a62;--card:#FFFFFF;
+  --border:#DCE8DD;--shadow:0 6px 24px rgba(27,58,30,.10);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--ink);
+  background:linear-gradient(165deg,#F1F8F1 0%,#DDEEDD 45%,#C8E6C9 100%);
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+}
+/* 山水剪影装饰（纯 CSS） */
+.hills{position:fixed;left:0;right:0;bottom:0;height:34vh;pointer-events:none;z-index:0}
+.hills .h1,.hills .h2,.hills .h3{position:absolute;bottom:0;width:140%;left:-20%}
+.hills .h1{height:82%;background:rgba(46,125,50,.10);border-radius:48% 52% 0 0/100% 88% 0 0}
+.hills .h2{height:60%;background:rgba(46,125,50,.16);border-radius:60% 40% 0 0/100% 100% 0 0;left:-40%}
+.hills .h3{height:38%;background:rgba(27,94,32,.22);border-radius:40% 60% 0 0/90% 100% 0 0}
+.wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:48px 20px 40px}
+/* 头部 */
+.hero{text-align:center;margin-bottom:36px}
+.hero .eyebrow{display:inline-block;font-size:12px;letter-spacing:4px;color:var(--primary);background:rgba(46,125,50,.10);border:1px solid rgba(46,125,50,.25);padding:5px 16px;border-radius:999px;margin-bottom:16px}
+.hero h1{font-size:32px;font-weight:700;letter-spacing:2px;color:var(--primary-dark)}
+.hero h1 .accent{color:var(--primary-light)}
+.hero p{margin-top:12px;color:var(--muted);font-size:14px;line-height:1.8;max-width:640px;margin-left:auto;margin-right:auto}
+/* 卡片 */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:26px 24px 22px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;
+  transition:transform .25s ease,box-shadow .25s ease;
+}
+.card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(27,58,30,.16)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--primary-light),#81C784)}
+.card .icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;background:linear-gradient(135deg,#E8F5E9,#C8E6C9)}
+.card h2{font-size:18px;font-weight:700;color:var(--primary-dark);line-height:1.4}
+.card .desc{font-size:13px;color:var(--muted);line-height:1.8;flex:1}
+.card .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px}
+.badge.demo{background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7}
+.badge.proto{background:#FFF8E1;color:#B26A00;border:1px solid #FFE082}
+.chip{font-size:11px;color:var(--muted);border:1px dashed var(--border);border-radius:999px;padding:3px 10px}
+.card .open{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  text-decoration:none;font-size:14px;font-weight:600;
+  background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;
+  padding:11px 16px;border-radius:12px;transition:filter .2s,transform .2s;
+}
+.card .open:hover{filter:brightness(1.08);transform:translateY(-1px)}
+/* 底部技术说明 */
+.notes{margin-top:44px;background:rgba(255,255,255,.75);backdrop-filter:blur(4px);border:1px solid var(--border);border-radius:16px;padding:22px 24px}
+.notes h3{font-size:14px;color:var(--primary-dark);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.notes ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.notes li{font-size:12.5px;color:var(--muted);line-height:1.8;padding-left:14px;position:relative}
+.notes li::before{content:'';position:absolute;left:0;top:.72em;width:6px;height:6px;border-radius:50%;background:var(--primary-light)}
+.notes b{color:var(--primary-dark)}
+footer{text-align:center;margin-top:28px;font-size:12px;color:var(--muted)}
+@media(max-width:600px){
+  .wrap{padding:32px 16px}
+  .hero h1{font-size:24px}
+  .hills{height:22vh}
+}
+</style>
+</head>
+<body>
+<div class="hills"><div class="h1"></div><div class="h2"></div><div class="h3"></div></div>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">AI + 教育方向</span>
+    <h1>教学系统<span class="accent">原型集</span></h1>
+    <p>本页面汇集三个教学系统原型。均为自包含单文件，可直接双击打开，或经任意本地 HTTP 服务（如 <code>python3 -m http.server</code>）访问，无需安装依赖。</p>
+  </header>
+
+  <main class="cards">
+    <section class="card">
+      <div class="icon">🧠</div>
+      <h2>A3 · 多智能体学习系统</h2>
+      <p class="desc">多 Agent 协作的个性化学习伴侣：内置知识库模拟导师、知识图谱、评估、规划四类智能体对话，配套能力画像雷达图与学习路径。</p>
+      <div class="meta">
+        <span class="badge proto">原型</span>
+        <span class="chip">静态交互原型</span>
+      </div>
+      <a class="open" href="A3_多智能体学习系统.html">打开原型 →</a>
+    </section>
+
+    <section class="card">
+      <div class="icon">🏔️</div>
+      <h2>A5 · 景区导览数字人「小桂」</h2>
+      <p class="desc">桂林山水 AI 导游原型：景点介绍、路线规划、美食与摄影攻略问答，数字人形象带情绪表情与动作反馈。</p>
+      <div class="meta">
+        <span class="badge proto">原型</span>
+        <span class="chip">静态交互原型</span>
+      </div>
+      <a class="open" href="A5_景区导览数字人.html">打开原型 →</a>
+    </section>
+
+    <section class="card">
+      <div class="icon">🎙️</div>
+      <h2>知声 · 语音知识图谱</h2>
+      <p class="desc">语音学习伴侣：录音上传 → 自动转写 → 知识图谱 → 复习卡 → 智能问答 → 学习统计全流程。当前为演示模式，内置 Mock 数据，无需后端。</p>
+      <div class="meta">
+        <span class="badge demo">可演示</span>
+        <span class="chip">演示模式 · Mock 数据</span>
+      </div>
+      <a class="open" href="知声_语音知识图谱.html">打开演示 →</a>
+    </section>
+  </main>
+
+  <section class="notes">
+    <h3>🛠️ 各原型技术说明</h3>
+    <ul>
+      <li><b>A3 多智能体学习系统</b>：单文件 HTML + 原生 JS；关键词路由匹配内置知识库，模拟多 Agent 协作与消息转发；Canvas 粒子背景与雷达图；无后端依赖。</li>
+      <li><b>A5 景区导览数字人</b>：单文件 HTML + 原生 JS；内置桂林景点 / 美食 / 半日·一日·两日路线知识库；数字人表情与口型动效为纯 CSS；语音按钮依赖浏览器麦克风权限（可选，不影响演示）。</li>
+      <li><b>知声 · 语音知识图谱</b>：单文件 HTML + 原生 JS；演示模式下页内 <code>mockFetch</code> 拦截全部接口请求并返回内置数据（上传转写延迟 1.5s 模拟真实体验）；接真实后端时将脚本顶部 <code>USE_MOCK</code> 改为 <code>false</code> 并配置 <code>API</code> 地址，详见页面内注释与 README。</li>
+    </ul>
+  </section>
+
+  <footer>教学系统原型集 · 三个原型相互独立，可单独部署或演示</footer>
+</div>
+</body>
+</html>

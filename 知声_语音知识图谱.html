@@ -31,7 +31,7 @@ body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f0e8;h
 .btn-primary{background:var(--primary);color:#fff}
 .btn-sm{padding:5px 12px;font-size:12px}
 /* 知识图谱 */
-#graphContainer{width:100%;height:500px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+#graphContainer{width:100%;height:500px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow-y:auto}
 /* 卡片复习 */
 .card-container{max-width:500px;margin:0 auto}
 .review-card{background:#fff;border-radius:16px;padding:30px;box-shadow:0 4px 16px rgba(0,0,0,.1);text-align:center;min-height:200px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform .3s}
@@ -60,6 +60,11 @@ body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f0e8;h
 .stat-card{background:#fff;border-radius:12px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .stat-card .number{font-size:32px;font-weight:700;color:var(--primary)}
 .stat-card .label{font-size:13px;color:#999;margin-top:4px}
+/* ===== 演示模式(Mock)===== */
+.header{flex-wrap:wrap}
+.mock-badge{margin-left:auto;flex-shrink:0;background:linear-gradient(135deg,#FF9800,#F57C00);color:#fff;font-size:11px;font-weight:600;padding:4px 12px;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.25);white-space:nowrap;cursor:help}
+.rec-item .transcript{font-size:12px;color:#666;line-height:1.6;margin-top:4px;border-top:1px dashed #eee;padding-top:4px}
+@media(max-width:600px){.header h1{font-size:13px}.mock-badge{font-size:10px;padding:3px 8px}}
 </style>
 </head>
 <body>
@@ -140,12 +145,254 @@ body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f5f0e8;h
 </div>
 
 <script>
-const API='http://localhost:8000/zhisheng';
+/* ==================================================================
+ * 【接入真实后端说明】
+ * 当前为演示模式：USE_MOCK = true 时，下方 mockFetch 会拦截本页所有
+ * 指向 API 的 fetch 请求，直接返回内置 Mock 数据（转写文本、知识图谱
+ * 节点/边、复习卡、问答、统计），无需任何后端即可完整演示。
+ *
+ * 接入真实后端时：
+ *   1) 将 USE_MOCK 改为 false（顶部"演示模式"徽章会自动隐藏）；
+ *   2) 将下方 API 常量改为真实后端地址（当前默认 http://localhost:8000/zhisheng）；
+ *   3) 后端需实现以下接口（与 mock 返回结构一一对应）：
+ *      POST /upload_audio            FormData(file,student_id,course_name)
+ *                                    → {recording_id, status, course_name, transcript}
+ *      POST /extract_knowledge/{id}  → {recording_id, points:[{name,type,summary}]}
+ *      GET  /knowledge_graph/{course}→ {nodes:[{id,label,type}], edges:[{source,target,relation}]}
+ *      GET  /review_cards/{student}  → [{card_id, card_type, front, back}]
+ *      POST /review                  JSON(card_id,student_id,feedback) → {ok,...}
+ *      POST /ask                     JSON(student_id,question) → {answer, sources:[{title,snippet}]}
+ *      GET  /stats/{student}         → {total_reviews, mastery_rate, streak_days, cards_due_today}
+ * ================================================================== */
+const USE_MOCK = true;                 // ← 接真实后端时改为 false
+const API = 'http://localhost:8000/zhisheng';  // ← 真实后端地址（USE_MOCK=false 时生效）
 let studentId='stu_'+Date.now();
+
+/* ==================================================================
+ * Mock 数据层（仅 USE_MOCK=true 时生效）
+ * ================================================================== */
+const MOCK_STATE={total_reviews:86,mastery_rate:72,streak_days:5,cards_due_today:5};
+
+// 上传后 1.5 秒返回的固定转写文本（模拟语音识别结果）
+const MOCK_TRANSCRIPT='同学们好，今天我们讲旅游心理学第三章——旅游动机。首先要区分两个概念：推力因素与拉力因素。推力因素来自游客内心，比如逃离日常、休闲放松、增进亲情；拉力因素来自目的地，比如桂林的山水、美食和民俗节庆。马斯洛需求层次理论告诉我们，旅游需求往往位于尊重与自我实现的高层级。请记住一句话：动机是需求被唤醒的结果。最后留一个思考题——为什么同一次旅行，不同人的满意度差别很大？下节课我们用期望差异理论来回答。';
+
+// 提取知识点接口返回
+const MOCK_KNOWLEDGE_POINTS=[
+ {name:'推力因素',type:'概念',summary:'来自游客内心的旅行驱动力，如逃离日常、休闲放松、社交与自我实现。'},
+ {name:'拉力因素',type:'概念',summary:'来自目的地的外部吸引力，如桂林山水、特色美食、民俗节庆。'},
+ {name:'马斯洛需求层次',type:'理论',summary:'生理→安全→社交→尊重→自我实现；旅游需求多属尊重与自我实现层级。'},
+ {name:'期望差异理论',type:'理论',summary:'满意度=实际感知−事前期望；感知高于期望则满意，反之不满。'}
+];
+
+// 知识图谱数据（节点 + 边），key 与课程下拉框选项一致
+const MOCK_GRAPHS={
+ '旅游心理学':{
+  nodes:[
+   {id:'n0',label:'旅游心理学',type:'course'},
+   {id:'n1',label:'旅游动机',type:'chapter'},
+   {id:'n2',label:'旅游知觉',type:'chapter'},
+   {id:'n3',label:'学习与记忆',type:'chapter'},
+   {id:'n4',label:'旅游满意度',type:'chapter'},
+   {id:'n5',label:'推力因素',type:'knowledge_point'},
+   {id:'n6',label:'拉力因素',type:'knowledge_point'},
+   {id:'n7',label:'马斯洛需求层次',type:'knowledge_point'},
+   {id:'n8',label:'知觉选择性',type:'knowledge_point'},
+   {id:'n9',label:'首因效应',type:'knowledge_point'},
+   {id:'n10',label:'艾宾浩斯遗忘曲线',type:'knowledge_point'},
+   {id:'n11',label:'期望差异理论',type:'knowledge_point'},
+   {id:'n12',label:'服务质量差距模型',type:'knowledge_point'}
+  ],
+  edges:[
+   {source:'旅游心理学',target:'旅游动机',relation:'包含'},
+   {source:'旅游心理学',target:'旅游知觉',relation:'包含'},
+   {source:'旅游心理学',target:'学习与记忆',relation:'包含'},
+   {source:'旅游心理学',target:'旅游满意度',relation:'包含'},
+   {source:'旅游动机',target:'推力因素',relation:'讲解'},
+   {source:'旅游动机',target:'拉力因素',relation:'讲解'},
+   {source:'旅游动机',target:'马斯洛需求层次',relation:'支撑'},
+   {source:'旅游知觉',target:'知觉选择性',relation:'讲解'},
+   {source:'旅游知觉',target:'首因效应',relation:'讲解'},
+   {source:'学习与记忆',target:'艾宾浩斯遗忘曲线',relation:'讲解'},
+   {source:'旅游满意度',target:'期望差异理论',relation:'核心理论'},
+   {source:'旅游满意度',target:'服务质量差距模型',relation:'延伸'},
+   {source:'推力因素',target:'拉力因素',relation:'共同作用'},
+   {source:'旅游知觉',target:'旅游满意度',relation:'影响'},
+   {source:'首因效应',target:'旅游满意度',relation:'影响'}
+  ]
+ },
+ '导游业务':{
+  nodes:[
+   {id:'g0',label:'导游业务',type:'course'},
+   {id:'g1',label:'导游服务程序',type:'chapter'},
+   {id:'g2',label:'突发事件处理',type:'chapter'},
+   {id:'g3',label:'导游讲解艺术',type:'chapter'},
+   {id:'g4',label:'地陪接团流程',type:'knowledge_point'},
+   {id:'g5',label:'全陪服务规范',type:'knowledge_point'},
+   {id:'g6',label:'游客投诉处理',type:'knowledge_point'},
+   {id:'g7',label:'突发疾病应对',type:'knowledge_point'},
+   {id:'g8',label:'导游词创作',type:'knowledge_point'},
+   {id:'g9',label:'身体语言运用',type:'knowledge_point'}
+  ],
+  edges:[
+   {source:'导游业务',target:'导游服务程序',relation:'包含'},
+   {source:'导游业务',target:'突发事件处理',relation:'包含'},
+   {source:'导游业务',target:'导游讲解艺术',relation:'包含'},
+   {source:'导游服务程序',target:'地陪接团流程',relation:'讲解'},
+   {source:'导游服务程序',target:'全陪服务规范',relation:'讲解'},
+   {source:'突发事件处理',target:'游客投诉处理',relation:'讲解'},
+   {source:'突发事件处理',target:'突发疾病应对',relation:'讲解'},
+   {source:'导游讲解艺术',target:'导游词创作',relation:'讲解'},
+   {source:'导游讲解艺术',target:'身体语言运用',relation:'讲解'},
+   {source:'导游词创作',target:'身体语言运用',relation:'配合'}
+  ]
+ },
+ '酒店管理概论':{
+  nodes:[
+   {id:'h0',label:'酒店管理概论',type:'course'},
+   {id:'h1',label:'前厅管理',type:'chapter'},
+   {id:'h2',label:'客房管理',type:'chapter'},
+   {id:'h3',label:'餐饮管理',type:'chapter'},
+   {id:'h4',label:'超额预订控制',type:'knowledge_point'},
+   {id:'h5',label:'OTA分销渠道',type:'knowledge_point'},
+   {id:'h6',label:'房态管理',type:'knowledge_point'},
+   {id:'h7',label:'客房清洁标准',type:'knowledge_point'},
+   {id:'h8',label:'餐饮成本控制',type:'knowledge_point'}
+  ],
+  edges:[
+   {source:'酒店管理概论',target:'前厅管理',relation:'包含'},
+   {source:'酒店管理概论',target:'客房管理',relation:'包含'},
+   {source:'酒店管理概论',target:'餐饮管理',relation:'包含'},
+   {source:'前厅管理',target:'超额预订控制',relation:'讲解'},
+   {source:'前厅管理',target:'OTA分销渠道',relation:'讲解'},
+   {source:'客房管理',target:'房态管理',relation:'讲解'},
+   {source:'客房管理',target:'客房清洁标准',relation:'讲解'},
+   {source:'餐饮管理',target:'餐饮成本控制',relation:'讲解'},
+   {source:'超额预订控制',target:'房态管理',relation:'依赖'}
+  ]
+ }
+};
+function mockGraph(course){
+ return MOCK_GRAPHS[course]||{nodes:[{id:'x0',label:course,type:'course'},{id:'x1',label:'待导入知识点（请先上传录音）',type:'knowledge_point'}],edges:[]};
+}
+
+// 复习卡（间隔重复）
+const MOCK_CARDS=[
+ {card_id:'card_001',card_type:'concept',front:'什么是游客动机？',back:'推动人们进行旅游活动的内在心理驱动力，由推力因素（内在需求）与拉力因素（目的地吸引力）共同触发。'},
+ {card_id:'card_002',card_type:'fill_blank',front:'旅游满意度取决于游客的事前期望与______之间的比较。',back:'答案：实际感知（体验绩效）。感知≥期望→满意；感知<期望→不满，这就是期望差异理论。'},
+ {card_id:'card_003',card_type:'judge',front:'判断：拉力因素来自游客自身的内在需求。',back:'错误 ✖。拉力因素来自目的地的外部吸引力（景观、美食、节庆）；来自游客内心的才是推力因素。'},
+ {card_id:'card_004',card_type:'concept',front:'艾宾浩斯遗忘曲线对复习的启示是什么？',back:'遗忘先快后慢：应在学习后 24 小时内完成首次复习，并按间隔递增的节奏多次复习（间隔重复）。知声的复习卡正是按此安排的。'},
+ {card_id:'card_005',card_type:'fill_blank',front:'服务质量差距模型中，差距5是指______与______之间的差距。',back:'答案：顾客期望与顾客实际感知。它是前四大组织内部差距共同作用的结果。'}
+];
+
+// 智能问答（关键词命中 → 引用"录音原文"作答）
+const MOCK_QA=[
+ {re:/推力|拉力|动机/,
+  answer:'根据《旅游心理学》第三章课堂录音：动机是需求被唤醒的结果，由两组因素共同触发——<br><br>① <b>推力因素</b>：来自游客内心的驱动，如逃离日常、休闲放松、增进亲情、追求尊重与自我实现；<br>② <b>拉力因素</b>：来自目的地的外部吸引，如桂林山水、特色美食、民俗节庆。<br><br>两者"里应外合"，缺一不可。老师还在课上留了思考题：为什么同一次旅行，不同人的满意度差别很大？——这要用期望差异理论来解释。',
+  sources:[{title:'旅游心理学·第三章 旅游动机（课堂录音 12:35）',snippet:'推力因素来自游客内心…'},{title:'旅游心理学·第三章 课件 P14',snippet:'动机 = 需求 × 唤醒'}]},
+ {re:/满意度|忠诚/,
+  answer:'《旅游心理学》第四章要点：<b>满意度取决于游客事前期望与实际感知的比较</b>（期望差异理论）。实际感知≥期望→满意甚至惊喜；感知低于期望→不满。满意度进一步提升会带来重游意愿与正面口碑，即旅游忠诚度。录音里老师特别提醒：管理期望本身就是服务的一部分，过度营销抬高期望反而会降低满意度。',
+  sources:[{title:'旅游心理学·第四章 旅游满意度（课堂录音 31:02）',snippet:'满意度 = 感知 − 期望…'}]},
+ {re:/知觉|感知|选择性|首因/,
+  answer:'旅游知觉部分的核心考点：<b>知觉选择性</b>——人在同一时间只对少数刺激作出清晰反应，游客往往选择性关注与自己兴趣、经验相符的景观；<b>首因效应</b>——第一印象对整体评价影响最大，所以接团时的"首面服务"（导游词、车况、态度）格外关键。',
+  sources:[{title:'旅游心理学·第二章 旅游知觉（课堂录音 08:47）',snippet:'知觉选择性…'}]},
+ {re:/记忆|遗忘|复习|卡片|背诵/,
+  answer:'这正是知声的设计依据：<b>艾宾浩斯遗忘曲线</b>表明遗忘先快后慢，所以系统把你录音里的知识点自动做成复习卡，按间隔重复算法（24 小时内首次复习、之后间隔递增）安排提醒。现在就可以到「🃏 卡片复习」页完成今日任务，复习反馈会同步计入「📈 学习统计」。',
+  sources:[{title:'旅游心理学·第五章 学习与记忆（课堂录音 40:18）',snippet:'遗忘曲线…'}]},
+ {re:/马斯洛|需求层次|需求/,
+  answer:'马斯洛需求层次：生理→安全→社交→尊重→自我实现。<b>旅游需求多位于中高层级</b>：休闲放松偏社交与身心恢复，研学、挑战类旅游偏尊重与自我实现。录音里老师说："动机是需求被唤醒的结果"——营销要做的，就是把潜在需求唤醒，并与目的地的拉力因素相对接。',
+  sources:[{title:'旅游心理学·第三章 旅游动机（课堂录音 18:20）',snippet:'马斯洛需求层次…'}]},
+ {re:/服务|导游|差距|GAP/i,
+  answer:'<b>服务质量差距模型（GAP 模型）</b>指出：顾客满意度取决于差距5——顾客期望与实际感知之间的差距，而它由四个组织内部差距（不了解顾客期望、服务标准缺失、未按标准交付、外部宣传与实际不符）共同决定。对导游工作而言，规范服务程序、准确传递信息、不过度承诺，就是在缩小这些差距。',
+  sources:[{title:'旅游心理学·第四章 服务质量（课堂录音 33:15）',snippet:'GAP 模型五大差距…'}]}
+];
+const MOCK_QA_DEFAULT={
+ answer:'这个问题暂时没有匹配到录音原文（演示模式）。你可以试试问：<br>· 老师上课说的推力因素包括哪些？<br>· 什么是期望差异理论？<br>· 艾宾浩斯遗忘曲线对复习有什么启示？<br><br>接入真实后端后，这里将由 RAG 检索录音原文来回答。',
+ sources:[]
+};
+
+// 统计页趋势图（近7天掌握度，末位与当前掌握率一致）
+const MOCK_TREND=[55,58,61,60,65,68,MOCK_STATE.mastery_rate];
+
+const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const _mockJson=(obj,status)=>new Response(JSON.stringify(obj),{status:status||200,headers:{'Content-Type':'application/json; charset=utf-8'}});
+
+// Mock 路由：按路径+方法返回内置数据；延迟让加载动效真实可感
+async function mockRoute(url,init){
+  let path=url.slice(API.length).split('?')[0];
+  try{path=decodeURIComponent(path)}catch(e){}
+  let method='GET';try{method=((init&&init.method)||'GET').toUpperCase()}catch(e){}
+  // 1. 上传转写：延迟 1.5s 后返回固定转写文本
+  if(path==='/upload_audio'&&method==='POST'){
+    await _sleep(1500);
+    return _mockJson({recording_id:'rec_'+Date.now(),status:'transcribed',course_name:'旅游心理学',transcript:MOCK_TRANSCRIPT});
+  }
+  let m;
+  // 2. 提取知识点
+  if((m=path.match(/^\/extract_knowledge\/(.+)$/))){
+    await _sleep(1200);
+    return _mockJson({recording_id:m[1],points:MOCK_KNOWLEDGE_POINTS});
+  }
+  // 3. 知识图谱（节点+边）
+  if((m=path.match(/^\/knowledge_graph\/(.+)$/))){
+    await _sleep(400);
+    return _mockJson(mockGraph(m[1]));
+  }
+  // 4. 复习卡列表
+  if((m=path.match(/^\/review_cards\/(.+)$/))){
+    await _sleep(400);
+    return _mockJson(MOCK_CARDS.slice());
+  }
+  // 5. 复习反馈：同步更新 Mock 统计，让数据"活"起来
+  if(path==='/review'&&method==='POST'){
+    MOCK_STATE.total_reviews++;
+    if(MOCK_STATE.cards_due_today>0)MOCK_STATE.cards_due_today--;
+    MOCK_STATE.mastery_rate=Math.min(99,MOCK_STATE.mastery_rate+1);
+    MOCK_TREND[MOCK_TREND.length-1]=MOCK_STATE.mastery_rate;
+    return _mockJson(Object.assign({ok:true,message:'已记录复习反馈，下次复习时间已调整'},MOCK_STATE));
+  }
+  // 6. 智能问答：关键词命中返回引用来源的答案
+  if(path==='/ask'&&method==='POST'){
+    await _sleep(900);
+    let q='';try{q=(JSON.parse(init.body)||{}).question||''}catch(e){}
+    const hit=MOCK_QA.find(k=>k.re.test(q));
+    return _mockJson(hit?{answer:hit.answer,sources:hit.sources}:{answer:MOCK_QA_DEFAULT.answer,sources:[]});
+  }
+  // 7. 学习统计
+  if((m=path.match(/^\/stats\/(.+)$/))){
+    await _sleep(300);
+    return _mockJson(Object.assign({student_id:m[1]},MOCK_STATE));
+  }
+  // 未实现的接口：返回 404（JSON），便于排查
+  return _mockJson({detail:'Mock 未实现该接口: '+path},404);
+}
+
+// 包装 fetch：USE_MOCK=true 时拦截所有指向 API 的请求；其余请求放行
+const _realFetch=(typeof window.fetch==='function')?window.fetch.bind(window):null;
+function mockFetch(input,init){
+  let url='';
+  try{url=(typeof input==='string')?input:(input&&input.url)||''}catch(e){}
+  if(url.indexOf(API)===0)return mockRoute(url,init);
+  if(_realFetch)return _realFetch(input,init);
+  return Promise.reject(new Error('fetch 不可用'));
+}
+if(USE_MOCK){
+  window.fetch=function(input,init){return mockFetch(input,init)};
+}
+// 顶部演示模式徽章
+if(USE_MOCK){
+  const badge=document.createElement('span');
+  badge.className='mock-badge';
+  badge.id='mockBadge';
+  badge.textContent='演示模式 · Mock 数据';
+  badge.title='演示模式：所有接口返回内置 Mock 数据，无需后端。\n接入真实后端：将脚本顶部 USE_MOCK 改为 false，并把 API 常量改为真实后端地址。';
+  const h=document.querySelector('.header');
+  if(h)h.appendChild(badge);
+}
 
 function switchTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
   document.querySelectorAll('.page').forEach((p,j)=>p.classList.toggle('active',j===i));
+  if(i===1)loadGraph();
   if(i===4)loadStats();
 }
 
@@ -156,11 +403,36 @@ async function uploadFile(file){
   fd.append('file',file);
   fd.append('student_id',studentId);
   fd.append('course_name','旅游心理学');
+  // 演示增强：先插入"转写中…"条目，接口返回后更新为"已转写"并展示转写文本
+  const item=addRecItem(file.name);
   try{
     const r=await fetch(`${API}/upload_audio`,{method:'POST',body:fd});
     const d=await r.json();
-    alert(`上传成功！录音ID: ${d.recording_id}`);
-  }catch(e){alert('上传失败: '+e.message)}
+    item.done(d.transcript);
+    alert(`上传成功！录音ID: ${d.recording_id}`+(d.transcript?'\n\n📄 已自动转写：\n'+d.transcript:''));
+  }catch(e){item.fail();alert('上传失败: '+e.message)}
+}
+function addRecItem(name){
+  const list=document.getElementById('recList');
+  const div=document.createElement('div');
+  div.className='rec-item';
+  div.innerHTML='<div class="icon">🎤</div><div class="info"><div class="title"></div><div class="meta">刚刚 · 课程：旅游心理学</div></div><div class="status pending">转写中…</div>';
+  div.querySelector('.title').textContent=name||'现场录音.m4a';
+  list.insertBefore(div,list.firstChild);
+  return {
+    el:div,
+    done(transcript){
+      const st=div.querySelector('.status');
+      st.className='status done';st.textContent='已转写';
+      if(transcript){
+        const p=document.createElement('div');
+        p.className='transcript';
+        p.textContent='📄 转写文本：'+transcript;
+        div.querySelector('.info').appendChild(p);
+      }
+    },
+    fail(){const st=div.querySelector('.status');st.className='status pending';st.textContent='转写失败';}
+  };
 }
 function handleDrop(e){e.preventDefault();e.currentTarget.classList.remove('dragover');if(e.dataTransfer.files[0])uploadFile(e.dataTransfer.files[0])}
 
@@ -179,10 +451,31 @@ function renderGraph(data){
   let html='<div style="padding:20px">';
   data.nodes.forEach(n=>{
     const color=n.type==='course'?'#4A148C':n.type==='knowledge_point'?'#7B1FA2':'#CE93D8';
-    html+=`<span style="display:inline-block;margin:6px;padding:8px 16px;background:${color};color:#fff;border-radius:20px;font-size:13px">${n.label}</span>`;
+    const size=n.type==='course'?'font-size:15px;font-weight:700':'font-size:13px';
+    html+=`<span title="${n.type||''}" style="display:inline-block;margin:6px;padding:8px 16px;background:${color};color:#fff;border-radius:20px;${size}">${n.label}</span>`;
   });
   html+='</div>';
+  // 渲染边（知识点关系）；真实后端未返回 edges 时自动跳过
+  if(data.edges&&data.edges.length){
+    html+='<div style="padding:0 20px 20px;color:#555;font-size:12px;line-height:2">';
+    html+='<div style="font-weight:600;color:#4A148C;margin-bottom:2px">🔗 知识关系</div>';
+    data.edges.forEach(e=>{
+      html+=`<div>${e.source} <span style="color:#7B1FA2;font-weight:600">— ${e.relation} →</span> ${e.target}</div>`;
+    });
+    html+='</div>';
+  }
   c.innerHTML=html;
+}
+
+// 提取知识点（修复：原 HTML 按钮引用了本函数但从未定义）
+async function extractKnowledge(recId){
+  try{
+    const r=await fetch(`${API}/extract_knowledge/${recId}`,{method:'POST'});
+    const d=await r.json();
+    if(!d.points||!d.points.length){alert('未能从该录音中提取出知识点');return}
+    const lines=d.points.map((p,i)=>`${i+1}. ${p.name}（${p.type}）：${p.summary}`).join('\n');
+    alert(`已从录音 #${recId} 提取出 ${d.points.length} 个知识点：\n\n${lines}\n\n已同步到「📊 知识图谱」页签，可切换查看。`);
+  }catch(e){alert('提取失败: '+e.message)}
 }
 
 // 卡片复习
@@ -243,7 +536,41 @@ async function loadStats(){
     document.getElementById('statMastery').textContent=(d.mastery_rate||0)+'%';
     document.getElementById('statStreak').textContent=d.streak_days||0;
     document.getElementById('statDue').textContent=d.cards_due_today||0;
+    drawTrend(d.mastery_rate||0);
   }catch(e){}
+}
+// 掌握度趋势折线（近7天，末位为当前掌握率）
+function drawTrend(current){
+  const canvas=document.getElementById('trendChart');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height,pad=30;
+  ctx.clearRect(0,0,w,h);
+  const vals=MOCK_TREND.map((v,i)=>i===MOCK_TREND.length-1?current:v);
+  const min=Math.max(0,Math.min.apply(null,vals)-10),max=Math.min(100,Math.max.apply(null,vals)+10);
+  const px=i=>pad+i*(w-pad*2)/(vals.length-1);
+  const py=v=>h-pad-(v-min)*(h-pad*2)/(max-min);
+  // 网格
+  ctx.strokeStyle='rgba(74,20,140,0.08)';ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y=pad+g*(h-pad*2)/4;
+    ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();
+  }
+  // 折线
+  ctx.beginPath();
+  vals.forEach((v,i)=>{i===0?ctx.moveTo(px(i),py(v)):ctx.lineTo(px(i),py(v))});
+  ctx.strokeStyle='#7B1FA2';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+  // 数据点与标签
+  ctx.font='11px -apple-system,"Microsoft YaHei",sans-serif';
+  vals.forEach((v,i)=>{
+    ctx.beginPath();ctx.arc(px(i),py(v),4,0,Math.PI*2);
+    ctx.fillStyle=i===vals.length-1?'#4A148C':'#CE93D8';ctx.fill();
+    ctx.fillStyle='#666';ctx.textAlign='center';
+    ctx.fillText(v+'%',px(i),py(v)-10);
+  });
+  ctx.fillStyle='#999';
+  const labels=['6天前','5天前','4天前','3天前','前天','昨天','今天'];
+  labels.forEach((t,i)=>ctx.fillText(t,px(i),h-8));
 }
 
 // 初始化
