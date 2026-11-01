@@ -389,6 +389,29 @@ if(USE_MOCK){
   if(h)h.appendChild(badge);
 }
 
+/* ---- 轻量 toast：右下角滑入，默认 2.5s 自动消失（成功=品牌紫 / 错误=红），替代原生 alert ---- */
+let _toastWrap=null;
+function toast(msg,type,duration){
+  if(!_toastWrap){
+    _toastWrap=document.createElement('div');
+    _toastWrap.style.cssText='position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:calc(100vw - 32px);pointer-events:none';
+    document.body.appendChild(_toastWrap);
+  }
+  const isErr=(type==='error');
+  const t=document.createElement('div');
+  t.style.cssText='max-width:min(360px,calc(100vw - 32px));padding:12px 16px;border-radius:10px;font-size:13px;line-height:1.7;color:#fff;'
+    +'white-space:pre-wrap;word-break:break-word;box-shadow:0 6px 18px rgba(0,0,0,.2);'
+    +'background:'+(isErr?'linear-gradient(135deg,#c62828,#e53935)':'linear-gradient(135deg,#4A148C,#7B1FA2)')+';'
+    +'opacity:0;transform:translateX(24px);transition:opacity .25s ease,transform .25s ease';
+  t.textContent=(isErr?'⚠️ ':'✅ ')+msg;
+  _toastWrap.appendChild(t);
+  requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateX(0)'});
+  setTimeout(()=>{
+    t.style.opacity='0';t.style.transform='translateX(24px)';
+    setTimeout(()=>{t.remove();if(!_toastWrap.children.length){_toastWrap.remove();_toastWrap=null}},300);
+  },duration||2500);
+}
+
 function switchTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
   document.querySelectorAll('.page').forEach((p,j)=>p.classList.toggle('active',j===i));
@@ -409,8 +432,8 @@ async function uploadFile(file){
     const r=await fetch(`${API}/upload_audio`,{method:'POST',body:fd});
     const d=await r.json();
     item.done(d.transcript);
-    alert(`上传成功！录音ID: ${d.recording_id}`+(d.transcript?'\n\n📄 已自动转写：\n'+d.transcript:''));
-  }catch(e){item.fail();alert('上传失败: '+e.message)}
+    toast(`上传成功！录音ID: ${d.recording_id}`+(d.transcript?'\n📄 已自动转写，转写文本见列表条目':''),null,3000);
+  }catch(e){item.fail();toast('上传失败: '+e.message,'error')}
 }
 function addRecItem(name){
   const list=document.getElementById('recList');
@@ -472,10 +495,10 @@ async function extractKnowledge(recId){
   try{
     const r=await fetch(`${API}/extract_knowledge/${recId}`,{method:'POST'});
     const d=await r.json();
-    if(!d.points||!d.points.length){alert('未能从该录音中提取出知识点');return}
-    const lines=d.points.map((p,i)=>`${i+1}. ${p.name}（${p.type}）：${p.summary}`).join('\n');
-    alert(`已从录音 #${recId} 提取出 ${d.points.length} 个知识点：\n\n${lines}\n\n已同步到「📊 知识图谱」页签，可切换查看。`);
-  }catch(e){alert('提取失败: '+e.message)}
+    if(!d.points||!d.points.length){toast('未能从该录音中提取出知识点','error');return}
+    const lines=d.points.map(p=>`· ${p.name}（${p.type}）`).join('\n');
+    toast(`已从录音 #${recId} 提取出 ${d.points.length} 个知识点：\n${lines}\n已同步到「📊 知识图谱」页签，可切换查看。`,null,4000);
+  }catch(e){toast('提取失败: '+e.message,'error')}
 }
 
 // 卡片复习
